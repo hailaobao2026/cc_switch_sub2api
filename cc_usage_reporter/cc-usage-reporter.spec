@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['cc_usage_reporter\\__main__.py'],
+    ['cc_usage_reporter/__main__.py'],
     pathex=[],
     binaries=[],
     datas=[],
