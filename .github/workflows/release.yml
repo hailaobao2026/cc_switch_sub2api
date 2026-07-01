@@ -26,6 +26,9 @@ jobs:
           - runner: ubuntu-latest
             os_name: linux
             archive_ext: tar.gz
+          - runner: ubuntu-22.04
+            os_name: linux-ubuntu22
+            archive_ext: tar.gz
           - runner: macos-latest
             os_name: macos
             archive_ext: tar.gz
@@ -117,4 +120,5 @@ jobs:
           files: |
             artifacts/cc-usage-reporter-windows/*
             artifacts/cc-usage-reporter-linux/*
+            artifacts/cc-usage-reporter-linux-ubuntu22/*
             artifacts/cc-usage-reporter-macos/*
