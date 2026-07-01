@@ -119,6 +119,17 @@ Write-Host "To install WinSW service:"
 Write-Host "powershell -ExecutionPolicy Bypass -File $BaseDir\scripts\windows\install_winsw.ps1 -ConfigPath \"$env:USERPROFILE\.config\cc-switch\usage_reporter.json\""
 '''
 
+WINDOWS_GUI_LAUNCHER_VBS = r'''Set shell = CreateObject("WScript.Shell")
+Set fso = CreateObject("Scripting.FileSystemObject")
+baseDir = fso.GetParentFolderName(WScript.ScriptFullName)
+cliPath = fso.BuildPath(baseDir, "cc-usage-reporter-cli.exe")
+If Not fso.FileExists(cliPath) Then
+  MsgBox "Missing file: " & cliPath, 16, "CC Usage Reporter"
+  WScript.Quit 1
+End If
+shell.Run """" & cliPath & """ gui", 0, False
+'''
+
 
 def _copy_file(src: Path, dst: Path) -> None:
     if not src.exists():
@@ -141,8 +152,12 @@ def _write_text(path: Path, content: str) -> None:
 def _normalized_bin_name(name: str) -> str:
     lower = name.lower()
     if "gui" in lower:
-        return "cc-usage-reporter-gui.exe" if lower.endswith('.exe') else "cc-usage-reporter-gui"
-    return "cc-usage-reporter.exe" if lower.endswith('.exe') else "cc-usage-reporter"
+        if lower.endswith(".exe"):
+            return "cc-usage-reporter.exe"
+        return "cc-usage-reporter"
+    if lower.endswith(".exe"):
+        return "cc-usage-reporter-cli.exe"
+    return "cc-usage-reporter-cli"
 
 
 def _sha256_file(path: Path) -> str:
@@ -245,6 +260,7 @@ def generate_release_dir(*, root: str | None = None, platform_name: str | None =
 def _generate_installers(outdir: Path, plat: str) -> None:
     if plat == "windows":
         _write_text(outdir / "install.ps1", WINDOWS_INSTALL_PS1)
+        _write_text(outdir / "bin" / "cc-usage-reporter.vbs", WINDOWS_GUI_LAUNCHER_VBS)
     else:
         _write_text(outdir / "install.sh", POSIX_INSTALL_SH)
 

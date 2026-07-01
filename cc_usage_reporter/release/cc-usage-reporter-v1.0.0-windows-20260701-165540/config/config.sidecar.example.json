@@ -1,0 +1,15 @@
+{
+  "base_url": "http://127.0.0.1:8788",
+  "report_path": "/api/v1/usage/report",
+  "username": "alice",
+  "email": "alice@example.com",
+  "token": "change-me-to-the-same-long-random-token-as-sidecar",
+  "db_path": "/home/alice/.config/cc-switch/cc-switch.db",
+  "state_path": "/home/alice/.config/cc-switch/usage_reporter_state.json",
+  "verify_tls": true,
+  "auto_upload": true,
+  "schedule_times": [
+    "10:00",
+    "18:00"
+  ]
+}

@@ -1,0 +1,20 @@
+[project]
+name = "cc-usage-reporter"
+version = "1.0.0"
+description = "将 CC Switch 本地模型用量上报到 sub2api 平台（按用户名/邮箱关联，每日聚合）"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pystray>=0.19.5",
+  "Pillow>=10.0.0",
+]
+
+[project.scripts]
+cc-usage-reporter = "cc_usage_reporter.cli:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["cc_usage_reporter"]

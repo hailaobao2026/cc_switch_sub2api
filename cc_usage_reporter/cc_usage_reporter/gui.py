@@ -10,6 +10,7 @@ from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from .autostart import get_autostart_status, install_autostart, uninstall_autostart
 from .config import Config, DEFAULT_GUI_CONFIG_PATH, load_config
+from .deps import check_tray_dependencies
 from .scheduler import BackgroundScheduler, ScheduleInfo, compute_next_run, parse_schedule_times
 from .sub2api_client import Sub2ApiError
 
@@ -38,6 +39,7 @@ class ReporterApp:
         self.scheduler: BackgroundScheduler | None = None
         self.tray_icon = None
         self.tray_thread: threading.Thread | None = None
+        self._tray_available: bool | None = None
 
         self._build_ui()
         self._load_gui_config()
@@ -315,6 +317,10 @@ class ReporterApp:
         threading.Thread(target=worker, daemon=True).start()
 
     def minimize_to_background(self) -> None:
+        if not self._can_use_tray():
+            messagebox.showwarning("系统托盘不可用", "当前环境缺少 pystray 或 Pillow，无法最小化到系统托盘。")
+            self.set_status("系统托盘不可用")
+            return
         self.root.withdraw()
         self.set_status("已最小化到后台")
         self._ensure_tray()
@@ -324,6 +330,16 @@ class ReporterApp:
         self.root.lift()
         self.root.focus_force()
         self.set_status("窗口已恢复")
+
+    def _can_use_tray(self) -> bool:
+        if self._tray_available is None:
+            result = check_tray_dependencies()
+            self._tray_available = result.ok
+            if not result.ok:
+                self.log("系统托盘不可用，将回退为正常关闭窗口")
+                for message in result.messages:
+                    self.log(message)
+        return self._tray_available
 
     def _ensure_tray(self) -> None:
         if self.tray_thread and self.tray_thread.is_alive():
@@ -389,7 +405,7 @@ class ReporterApp:
         self.root.after(300, self._drain_logs)
 
     def on_close(self) -> None:
-        if bool(self.fields["minimize_to_tray"].get()):
+        if bool(self.fields["minimize_to_tray"].get()) and self._can_use_tray():
             self.minimize_to_background()
             return
         self._real_close()

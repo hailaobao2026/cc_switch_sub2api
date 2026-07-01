@@ -137,6 +137,27 @@ CLI 版：
 pyinstaller .\cc-usage-reporter.spec
 ```
 
+## GitHub Releases 自动发布
+
+仓库已增加 GitHub Actions 发布工作流：
+
+- 标签格式：`cc-usage-reporter-v1.0.0`
+- 推送标签后会分别在 `Windows`、`Linux`、`macOS` 上构建
+- 构建完成后会自动创建 GitHub Release 并上传 3 个平台附件
+
+发布命令：
+
+```bash
+git tag cc-usage-reporter-v1.0.0
+git push origin cc-usage-reporter-v1.0.0
+```
+
+Release 中的附件名称示例：
+
+- `cc-usage-reporter-v1.0.0-windows.zip`
+- `cc-usage-reporter-v1.0.0-linux.tar.gz`
+- `cc-usage-reporter-v1.0.0-macos.tar.gz`
+
 GUI 版：
 
 ```powershell
