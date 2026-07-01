@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# 配置（含密码）与运行状态
+config.json
+config.sidecar.json
+*_state.json
+*.lock
+_test*.json
+
+# 编辑器
+.vscode/
+.idea/

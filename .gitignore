@@ -1,0 +1,45 @@
+.DS_Store
+Thumbs.db
+
+# Editor / local agent state
+.claude/
+.agents/
+.codex/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git metadata from nested repos should never be committed
+**/.git/
+
+# Python
+**/__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node / frontend
+**/node_modules/
+**/dist/
+**/.vite/
+coverage/
+
+# Go / generic build outputs
+bin/
+build/
+tmp/
+temp/
+*.log
+
+# Environment / local config
+.env
+.env.*
+!.env.example
+config.local.*
+config.sidecar.json
+
+# Runtime data
+deploy/data/
+deploy/postgres_data/
+deploy/redis_data/

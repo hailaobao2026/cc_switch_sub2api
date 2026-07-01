@@ -1,0 +1,54 @@
+# =============================================================================
+# CC Switch Usage Sidecar Compose Overlay
+# =============================================================================
+# Usage:
+#   1. Copy .env.example to .env and configure Sub2API as usual.
+#   2. Set CC_USAGE_SIDECAR_REPORT_TOKEN in .env.
+#   3. Start with:
+#      docker compose -f docker-compose.yml -f docker-compose.cc-switch-sidecar.yml up -d --build
+# =============================================================================
+
+services:
+  cc-switch-usage-sidecar:
+    build:
+      context: ../../sidecar
+      dockerfile: Dockerfile
+      args:
+        GOLANG_IMAGE: ${SIDECAR_GOLANG_IMAGE:-golang:1.22-alpine}
+        ALPINE_IMAGE: ${SIDECAR_ALPINE_IMAGE:-alpine:3.20}
+        GOPROXY: ${GOPROXY:-https://goproxy.cn,direct}
+        GOSUMDB: ${GOSUMDB:-sum.golang.google.cn}
+    image: cc-switch-usage-sidecar:local
+    container_name: cc-switch-usage-sidecar
+    restart: unless-stopped
+    environment:
+      - CC_USAGE_SIDECAR_LISTEN_ADDR=0.0.0.0:8788
+      - CC_USAGE_SIDECAR_DATABASE_URL=postgres://${POSTGRES_USER:-sub2api}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-sub2api}?sslmode=disable
+      - CC_USAGE_SIDECAR_REPORT_TOKEN=${CC_USAGE_SIDECAR_REPORT_TOKEN:?CC_USAGE_SIDECAR_REPORT_TOKEN is required}
+      - CC_USAGE_SIDECAR_AUTO_MIGRATE=${CC_USAGE_SIDECAR_AUTO_MIGRATE:-true}
+      - TZ=${TZ:-Asia/Shanghai}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - sub2api-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "-T",
+          "5",
+          "-O",
+          "/dev/null",
+          "http://localhost:8788/healthz",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    # The service is intentionally not exposed publicly.
+    # If a CC Switch reporter runs on the Docker host, uncomment this binding:
+    ports:
+      - "0.0.0.0:${CC_USAGE_SIDECAR_PORT:-8788}:8788"

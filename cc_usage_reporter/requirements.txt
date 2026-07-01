@@ -1,0 +1,2 @@
+# cc_usage_reporter 仅依赖 Python 标准库（sqlite3 / urllib / json）。
+# 无需安装第三方包。Python >= 3.10。

@@ -1,0 +1,19 @@
+{
+  "base_url": "https://sub2api.example.com",
+  "login_path": "/api/v1/auth/login",
+  "report_path": "/api/v1/usage/report",
+
+  "username": "alice",
+  "email": "alice@example.com",
+  "password": "在此填写 sub2api 登录密码（或改用 token / 环境变量）",
+  "token": "",
+
+  "db_path": "C:\\Users\\Administrator\\.cc-switch\\cc-switch.db",
+  "state_path": "C:\\Users\\Administrator\\.cc-switch\\usage_reporter_state.json",
+
+  "app_types": ["claude", "codex"],
+  "only_success": true,
+  "timeout": 30.0,
+  "batch_size": 200,
+  "verify_tls": true
+}

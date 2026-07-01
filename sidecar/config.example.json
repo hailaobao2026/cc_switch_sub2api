@@ -1,0 +1,8 @@
+{
+  "listen_addr": "127.0.0.1:8788",
+  "database_url": "postgres://sub2api:sub2api@127.0.0.1:5432/sub2api?sslmode=disable",
+  "report_token": "change-me-to-a-long-random-token",
+  "auto_migrate": true,
+  "allowed_sources": ["cc-switch"],
+  "max_items": 5000
+}
