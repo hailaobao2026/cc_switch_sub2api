@@ -1,5 +1,0 @@
-# CLI / core
-
-# Optional GUI tray support (Windows / Linux / macOS)
-pystray>=0.19.5
-Pillow>=10.0.0
