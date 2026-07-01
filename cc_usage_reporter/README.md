@@ -1,11 +1,13 @@
 # cc_usage_reporter — CC Switch 用量上报客户端
 
-把本机 **CC Switch**（`~/.cc-switch/cc-switch.db`）记录的模型调用用量，按 **天 × 模型** 聚合后上报到本项目的 **sidecar** 服务，再由 sidecar 写入 sub2api 使用的 PostgreSQL 外部用量表。
+把本机 **CC Switch** 数据库（默认会兼容 Windows / Linux / macOS 常见目录）记录的模型调用用量，按 **天 × 模型** 聚合后上报到本项目的 **sidecar** 服务，再由 sidecar 写入 sub2api 使用的 PostgreSQL 外部用量表。
 
 ## 工作原理
 
 ```text
-~/.cc-switch/cc-switch.db
+Windows: %APPDATA%\cc-switch\cc-switch.db
+Linux:   ~/.config/cc-switch/cc-switch.db  或 ~/.cc-switch/cc-switch.db
+macOS:   ~/Library/Application Support/cc-switch/cc-switch.db
     └─ proxy_request_logs (每次请求一行)
             │  读取(只读) + 按 UTC 天×模型 聚合
             ▼
@@ -55,7 +57,7 @@ Copy-Item config.sidecar.example.json config.sidecar.json
   "base_url": "http://127.0.0.1:8788",
   "token": "与 sidecar report_token 一致的长随机 token",
   "username": "alice",
-  "db_path": "C:\\Users\\Administrator\\.cc-switch\\cc-switch.db"
+  "db_path": "/home/alice/.config/cc-switch/cc-switch.db"
 }
 ```
 
@@ -79,11 +81,34 @@ python -m cc_usage_reporter run --config config.sidecar.json
 | `token` | `SUB2API_TOKEN` | Bearer token；sidecar 模式必须与 `report_token` 一致 |
 | `report_path` | `SUB2API_REPORT_PATH` | 默认 `/api/v1/usage/report` |
 | `login_path` | `SUB2API_LOGIN_PATH` | 旧登录模式使用，默认 `/api/v1/auth/login` |
-| `db_path` | `CC_SWITCH_DB_PATH` | 默认 `~/.cc-switch/cc-switch.db` |
-| `state_path` | `CC_SWITCH_STATE_PATH` | 上报状态文件 |
+| `db_path` | `CC_SWITCH_DB_PATH` | 默认按系统自动选择：Windows `%APPDATA%\cc-switch`；Linux `~/.config/cc-switch`；macOS `~/Library/Application Support/cc-switch`；同时兼容旧 `~/.cc-switch` |
+| `state_path` | `CC_SWITCH_STATE_PATH` | 上报状态文件，默认与 `db_path` 同目录 |
 | `app_types` | — | 默认 `['claude', 'codex']` |
 | `only_success` | — | 仅上报 2xx 请求（`--all` 可包含失败） |
 | `verify_tls` | `SUB2API_VERIFY_TLS` | HTTPS 自签名证书可设 false / `--no-verify-tls` |
+
+
+
+## 跨平台说明
+
+默认会优先查找这些目录：
+
+- **Windows**
+  - `%APPDATA%\cc-switch\cc-switch.db`
+  - `%APPDATA%\cc-switch\usage_reporter_state.json`
+- **Linux**
+  - `$XDG_CONFIG_HOME/cc-switch/cc-switch.db`
+  - `~/.config/cc-switch/cc-switch.db`
+  - 兼容旧路径：`~/.cc-switch/cc-switch.db`
+- **macOS**
+  - `~/Library/Application Support/cc-switch/cc-switch.db`
+  - 兼容路径：`~/.config/cc-switch/cc-switch.db` / `~/.cc-switch/cc-switch.db`
+
+如果你的数据库不在默认位置，仍可手动指定：
+
+```bash
+python -m cc_usage_reporter run --db-path "/custom/path/cc-switch.db"
+```
 
 ## 命令
 
@@ -93,119 +118,95 @@ python -m cc_usage_reporter run --config config.sidecar.json
 | `show` | 打印全部聚合桶，不联网 |
 | `run` | 上报变化的桶 |
 | `run --dry-run` | 演练，打印将要上报的桶但不发送 |
+| `gui` | 启动桌面版，支持保存配置、按钮上传、后台定时上传 |
+| `daemon` | 真后台常驻模式，无 GUI，按定时计划自动上传 |
+| `tray` | 仅系统托盘模式，适合桌面后台运行 |
+| `autostart-install` | 安装当前系统的开机自启（默认启动 GUI） |
+| `autostart-uninstall` | 移除开机自启 |
+| `autostart-status` | 查看开机自启状态 |
 
 常用参数：`--config` `--base-url` `--username` `--email` `--password` `--token` `--db-path` `--state-path` `--all` `--no-verify-tls` `--no-incremental`。
 
-## 打包为 Windows EXE
+## 打包与分发（Windows / Linux / macOS）
 
-可以用 PyInstaller 把客户端打包成单文件 EXE，安装后直接读取 `C:\Users\Administrator\.cc-switch\cc-switch.db` 并上报。
+### Windows
 
-### 1) 进入客户端目录
-
-```powershell
-cd F:\work\code\other\20260626\CC_Switch_plugin\cc_usage_reporter
-```
-
-### 2) 创建虚拟环境
+CLI 版：
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+pyinstaller .\cc-usage-reporter.spec
 ```
 
-如果 PowerShell 阻止执行脚本，先在当前窗口临时放开执行策略：
+GUI 版：
 
 ```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+pyinstaller .\cc-usage-reporter-gui.spec
 ```
 
-### 3) 安装 PyInstaller
+产物通常位于：
 
 ```powershell
-python -m pip install --upgrade pip
-python -m pip install pyinstaller
+.\dist\cc-usage-reporter.exe
+.\dist\cc-usage-reporter-gui.exe
 ```
 
-### 4) 打包前确认客户端可运行
+### Linux
+
+建议直接分发源码或用 PyInstaller 打包：
+
+```bash
+python3 -m pip install pyinstaller
+pyinstaller cc-usage-reporter.spec
+pyinstaller cc-usage-reporter-gui.spec
+```
+
+注意：
+
+- GUI 版依赖桌面环境与 Tk。
+- 若目标机器没有图形界面，仍可使用 CLI 版。
+
+### macOS
+
+可用 PyInstaller 打包：
+
+```bash
+python3 -m pip install pyinstaller
+pyinstaller cc-usage-reporter.spec
+pyinstaller cc-usage-reporter-gui.spec
+```
+
+注意：
+
+- GUI 版需要系统自带或已安装的 Tk。
+- 首次运行未签名应用时，可能需要在“系统设置 → 隐私与安全性”里允许打开。
+
+### 跨平台运行示例
+
+Linux / macOS：
+
+```bash
+python3 -m cc_usage_reporter gui
+python3 -m cc_usage_reporter run --config ./config.sidecar.json
+```
+
+Windows：
 
 ```powershell
-python -m cc_usage_reporter preview --db-path "C:\Users\Administrator\.cc-switch\cc-switch.db"
+python -m cc_usage_reporter gui
+python -m cc_usage_reporter run --config .\config.sidecar.json
 ```
 
-### 5) 打包单文件 EXE
+## 定时自动上报（Windows / Linux / macOS）
+
+Windows 可用 `dev/register_task.ps1` 注册计划任务（例如 `10:00,18:00`）：
 
 ```powershell
-pyinstaller `
-  --onefile `
-  --name cc-usage-reporter `
-  --console `
-  --clean `
-  cc_usage_reporter\__main__.py
+powershell -ExecutionPolicy Bypass -File dev\register_task.ps1 -ConfigPath "F:\...\config.sidecar.json" -AtTimes "10:00,18:00"
 ```
 
-打包完成后，EXE 位于：
+Linux / macOS 则可用 `cron` / `launchd` / `systemd --user`，或直接保持 GUI 常驻。
 
-```powershell
-F:\work\code\other\20260626\CC_Switch_plugin\cc_usage_reporter\dist\cc-usage-reporter.exe
-```
-
-### 6) 测试 EXE
-
-本地预览：
-
-```powershell
-.\dist\cc-usage-reporter.exe preview --db-path "C:\Users\Administrator\.cc-switch\cc-switch.db"
-```
-
-sidecar 上报演练：
-
-```powershell
-.\dist\cc-usage-reporter.exe run `
-  --base-url "http://127.0.0.1:8788" `
-  --token "你的-sidecar-report-token" `
-  --username "alice" `
-  --db-path "C:\Users\Administrator\.cc-switch\cc-switch.db" `
-  --state-path "C:\Users\Administrator\.cc-switch\usage_reporter_state.json" `
-  --dry-run
-```
-
-正式上报时去掉 `--dry-run`：
-
-```powershell
-.\dist\cc-usage-reporter.exe run `
-  --base-url "http://127.0.0.1:8788" `
-  --token "你的-sidecar-report-token" `
-  --username "alice" `
-  --db-path "C:\Users\Administrator\.cc-switch\cc-switch.db" `
-  --state-path "C:\Users\Administrator\.cc-switch\usage_reporter_state.json"
-```
-
-### 7) 使用配置文件运行
-
-复制并编辑 sidecar 示例配置：
-
-```powershell
-Copy-Item .\config.sidecar.example.json .\config.sidecar.json
-notepad .\config.sidecar.json
-```
-
-通过配置文件运行：
-
-```powershell
-.\dist\cc-usage-reporter.exe run --config .\config.sidecar.json --dry-run
-```
-
-打包产物只需要分发 `dist\cc-usage-reporter.exe`。配置文件和状态文件建议放在 `C:\Users\Administrator\.cc-switch\` 下。
-
-## 定时自动上报（Windows）
-
-用 `dev/register_task.ps1` 注册计划任务（每小时一次）：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File dev\register_task.ps1 -ConfigPath "F:\...\config.sidecar.json"
-```
-
-或手动用「任务计划程序」运行：
+也可以手动运行：
 
 ```powershell
 python -m cc_usage_reporter run --config <path>
@@ -216,3 +217,351 @@ python -m cc_usage_reporter run --config <path>
 - `config.sidecar.json` 含 token，请勿提交到版本库。
 - `token` 建议使用 32 字符以上随机字符串，并与 sidecar 的 `report_token` 保持一致。
 - sidecar 会按 `username` 或 `email` 解析 sub2api 用户；建议每台客户端只配置自己的用户标识。
+
+
+## 桌面工具（GUI）
+
+现在支持桌面版：
+
+```bash
+python -m cc_usage_reporter gui
+```
+
+打包后的 EXE 也可直接这样启动：
+
+```powershell
+.\cc-usage-reporter.exe gui
+```
+
+GUI 提供：
+
+- 配置 `db_path`、`base_url`、`token`、`email`、`username`
+- 保存配置到系统默认配置目录（Windows / Linux / macOS 自动识别）
+- 点击“立即上传”手动上传
+- 勾选“启动后后台定时上传”后，程序驻留运行并按设定时间自动上传
+- 默认定时：`10:00,18:00`
+
+说明：
+
+- 自动上传依赖程序保持运行；关闭窗口后定时任务也会停止。
+- 如需开机自启，可再配合 Windows 启动项、Linux systemd/桌面自启动、或 macOS Login Items / launchd。
+- 仍沿用原有状态文件去重逻辑，不会因定时运行而重复累计。
+
+
+GUI 建议单独打包为无控制台窗口版本：
+
+```powershell
+pyinstaller .\cc-usage-reporter-gui.spec
+```
+
+如需保留命令行版，则继续使用：
+
+```powershell
+pyinstaller .\cc-usage-reporter.spec
+```
+
+
+## 开机自启（跨平台）
+
+现在支持直接通过命令安装或移除开机自启：
+
+```bash
+python -m cc_usage_reporter autostart-install --config ./config.sidecar.json
+python -m cc_usage_reporter autostart-status
+python -m cc_usage_reporter autostart-uninstall
+```
+
+行为说明：
+
+- **Windows**：写入启动菜单 `Startup` 目录
+- **Linux**：写入 `~/.config/autostart/cc-usage-reporter.desktop`
+- **macOS**：写入 `~/Library/LaunchAgents/com.local.cc-usage-reporter.plist`
+- 默认会以 **GUI 模式** 启动
+- 默认附带 `--start-hidden`，即开机后最小化启动并继续后台定时上传
+
+如果你只想用纯命令行定时执行，也可以继续使用系统计划任务：
+
+- Windows：任务计划程序 / `dev/register_task.ps1`
+- Linux：`cron` / `systemd --user`
+- macOS：`launchd`
+
+
+## 真后台模式
+
+现在支持两种后台模式：
+
+### 1) daemon
+
+适合无桌面环境或服务器：
+
+```bash
+python -m cc_usage_reporter daemon --config ./config.sidecar.json
+```
+
+特点：
+
+- 不启动 GUI
+- 常驻进程
+- 按 `schedule_times` 定时上传
+- 适合 systemd / launchd / supervisor
+
+### 2) tray
+
+适合桌面用户：
+
+```bash
+python -m cc_usage_reporter tray --config ./config.sidecar.json
+```
+
+特点：
+
+- 仅显示系统托盘图标
+- 可从托盘菜单触发“立即上传”
+- 可从托盘退出程序
+- 适合 Windows / Linux 桌面 / macOS
+
+### GUI 最小化到托盘
+
+GUI 现在支持：
+
+- 关闭窗口时最小化到系统托盘
+- 从托盘恢复窗口
+- 从托盘立即上传
+- 从托盘退出
+
+> 注意：系统托盘功能依赖可选包 `pystray` 与 `Pillow`。
+
+
+## 服务模板与安装脚本
+
+项目已内置三端后台服务模板：
+
+- Linux: `service_templates/linux/cc-usage-reporter.service`
+- macOS: `service_templates/macos/com.local.cc-usage-reporter.plist`
+- Windows: `service_templates/windows/cc-usage-reporter.xml`
+
+对应安装脚本：
+
+- Linux systemd user: `packaging/linux/install_systemd_user.sh`
+- macOS launchd: `packaging/macos/install_launchd.sh`
+- Windows WinSW: `packaging/windows/install_winsw.ps1`
+
+### Linux 安装 systemd 用户服务
+
+```bash
+bash packaging/linux/install_systemd_user.sh ~/.config/cc-switch/usage_reporter.json
+```
+
+### macOS 安装 launchd
+
+```bash
+bash packaging/macos/install_launchd.sh "$HOME/Library/Application Support/cc-switch/usage_reporter.json"
+```
+
+### Windows 安装 WinSW 服务
+
+先准备 WinSW 可执行文件，再执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging\windows\install_winsw.ps1 -ConfigPath "$env:USERPROFILE\.config\cc-switch\usage_reporter.json"
+```
+
+
+## 打包脚本
+
+项目已内置三端打包脚本：
+
+- Windows: `packaging/windows/build.ps1`
+- Linux: `packaging/linux/build.sh`
+- macOS: `packaging/macos/build.sh`
+
+示例：
+
+### Windows
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging\windows\build.ps1
+```
+
+### Linux
+
+```bash
+bash packaging/linux/build.sh
+```
+
+### macOS
+
+```bash
+bash packaging/macos/build.sh
+```
+
+
+## 自动下载 WinSW
+
+Windows 服务安装脚本现在会自动尝试下载最新的 WinSW。
+
+单独下载：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging\windows\download_winsw.ps1 -OutputPath .\WinSW-x64.exe
+```
+
+更常见的是直接执行安装脚本；它会在缺少 WinSW 时自动调用下载：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging\windows\install_winsw.ps1 -ConfigPath "$env:USERPROFILE\.config\cc-switch\usage_reporter.json"
+```
+
+## tray 依赖检查
+
+可用下面命令检查系统托盘依赖是否齐全：
+
+```bash
+python -m cc_usage_reporter deps-check
+```
+
+若缺少依赖，安装：
+
+```bash
+pip install pystray Pillow
+```
+
+
+## 一键生成发布目录
+
+可用下面命令把文档、示例配置、服务模板、打包脚本、以及 `dist/` 产物汇总到一个发布目录：
+
+```bash
+python -m cc_usage_reporter release-dir
+python -m cc_usage_reporter release-pack
+```
+
+也可用平台脚本：
+
+- Windows: `packaging/windows/release_dir.ps1`
+- Linux: `packaging/linux/release_dir.sh`
+- macOS: `packaging/macos/release_dir.sh`
+
+
+## 标准化发布目录结构
+
+`release-dir` 现在会生成如下结构：
+
+```text
+release/cc-usage-reporter-<platform>-<timestamp>/
+  bin/
+  dist/
+  config/
+  scripts/
+  services/
+  docs/
+  metadata/
+  install.sh / install.ps1
+```
+
+说明：
+
+- `bin/`：规范化命名的可执行文件副本，例如 `cc-usage-reporter` / `cc-usage-reporter-gui`
+- 若当前尚未 build，`bin/` 可能为空；先执行打包脚本再生成 release 目录即可
+- `dist/`：原始打包产物
+- `config/`：示例配置
+- `scripts/`：安装、打包、辅助脚本
+- `services/`：服务模板
+- `docs/`：说明文档
+- `metadata/`：依赖与 manifest
+
+发布目录内还会自动生成：
+
+- `install.sh`
+- `install-linux.sh`
+- `install-macos.sh`
+- `install-windows.ps1`
+
+用于指导或直接执行部署。
+
+
+## 一键安装脚本
+
+标准化发布目录中会自动生成：
+
+- `install.sh`
+- `install-linux.sh`
+- `install-macos.sh`
+- `install-windows.ps1`
+
+用法示例：
+
+### Linux
+
+```bash
+bash ./install-linux.sh
+```
+
+### macOS
+
+```bash
+bash ./install-macos.sh
+```
+
+### Windows
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-windows.ps1
+```
+
+这些脚本会优先调用发布目录中已经准备好的 `scripts/` 和 `services/` 内容。
+
+
+## 统一一键发布脚本
+
+项目已提供统一发布脚本：
+
+- POSIX（Linux / macOS）：`packaging/common/publish.sh`
+- Windows：`packaging/windows/publish.ps1`
+
+功能：
+
+1. 安装依赖
+2. 检查 tray 依赖
+3. 执行平台打包脚本
+4. 自动生成带版本号的标准化发布目录
+5. 自动生成压缩包与 SHA256 校验
+
+### Linux / macOS
+
+```bash
+bash packaging/common/publish.sh
+```
+
+### Windows
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging\windows\publish.ps1
+```
+
+
+## release 压缩包与校验
+
+现在支持直接生成带压缩包和校验文件的发布目录：
+
+```bash
+python -m cc_usage_reporter release-pack
+```
+
+效果：
+
+- 生成标准化 release 目录
+- 自动生成 `.zip`
+- 自动生成 `.tar.gz`
+- 自动在 `metadata/SHA256SUMS.txt` 中写入校验值
+- release 目录名自动带版本号，例如：
+
+```text
+release/cc-usage-reporter-v1.0.0-linux-20260701-xxxxxx/
+```
+
+同时 `metadata/manifest.json` 也会写入：
+
+- `version`
+- `platform`
+- `generated_at`

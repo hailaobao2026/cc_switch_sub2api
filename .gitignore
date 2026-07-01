@@ -43,3 +43,7 @@ config.sidecar.json
 deploy/data/
 deploy/postgres_data/
 deploy/redis_data/
+
+**/.ipynb_checkpoints/
+
+cc_usage_reporter/release/

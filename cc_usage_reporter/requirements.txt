@@ -1,2 +1,5 @@
-# cc_usage_reporter 仅依赖 Python 标准库（sqlite3 / urllib / json）。
-# 无需安装第三方包。Python >= 3.10。
+# CLI / core
+
+# Optional GUI tray support (Windows / Linux / macOS)
+pystray>=0.19.5
+Pillow>=10.0.0

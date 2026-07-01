@@ -1,25 +1,69 @@
 """配置加载。
 
 配置优先级（高 → 低）：命令行参数 > 环境变量 > 配置文件 > 默认值。
-配置文件为 JSON，默认查找顺序：
-  1. ``--config`` 指定的路径
-  2. ``./config.json``
-  3. ``~/.cc-switch/usage_reporter.json``
+配置文件默认查找顺序会兼容 Windows / Linux / macOS 的常见目录，
+并保留历史 `~/.cc-switch` 路径。
 """
 
 from __future__ import annotations
 
 import json
 import os
+import platform
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 
-DEFAULT_DB_PATH = Path.home() / ".cc-switch" / "cc-switch.db"
-DEFAULT_STATE_PATH = Path.home() / ".cc-switch" / "usage_reporter_state.json"
-CONFIG_SEARCH_PATHS = (
-    Path("config.json"),
-    Path.home() / ".cc-switch" / "usage_reporter.json",
+def _dedup_paths(paths: list[Path]) -> tuple[Path, ...]:
+    seen: set[str] = set()
+    result: list[Path] = []
+    for path in paths:
+        key = str(path.expanduser())
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(path)
+    return tuple(result)
+
+
+def get_platform_data_dirs() -> tuple[Path, ...]:
+    home = Path.home()
+    system = platform.system()
+    candidates: list[Path] = []
+
+    if system == "Windows":
+        appdata = os.environ.get("APPDATA")
+        localappdata = os.environ.get("LOCALAPPDATA")
+        if appdata:
+            candidates.append(Path(appdata) / "cc-switch")
+        if localappdata:
+            candidates.append(Path(localappdata) / "cc-switch")
+        candidates.append(home / ".cc-switch")
+    elif system == "Darwin":
+        candidates.extend([
+            home / "Library" / "Application Support" / "cc-switch",
+            home / ".config" / "cc-switch",
+            home / ".cc-switch",
+        ])
+    else:
+        xdg = os.environ.get("XDG_CONFIG_HOME")
+        if xdg:
+            candidates.append(Path(xdg) / "cc-switch")
+        candidates.extend([
+            home / ".config" / "cc-switch",
+            home / ".cc-switch",
+        ])
+
+    return _dedup_paths(candidates)
+
+
+PLATFORM_DATA_DIRS = get_platform_data_dirs()
+DEFAULT_DATA_DIR = next((p for p in PLATFORM_DATA_DIRS if p.exists()), PLATFORM_DATA_DIRS[0])
+DEFAULT_DB_PATH = DEFAULT_DATA_DIR / "cc-switch.db"
+DEFAULT_STATE_PATH = DEFAULT_DATA_DIR / "usage_reporter_state.json"
+DEFAULT_GUI_CONFIG_PATH = DEFAULT_DATA_DIR / "usage_reporter.gui.json"
+CONFIG_SEARCH_PATHS = (Path("config.json"),) + tuple(
+    base / "usage_reporter.json" for base in PLATFORM_DATA_DIRS
 )
 
 # 配置项 -> 环境变量名
@@ -60,6 +104,10 @@ class Config:
     timeout: float = 30.0       # HTTP 超时（秒）
     batch_size: int = 200       # 每次 HTTP 上报的聚合条数
     verify_tls: bool = True     # 是否校验 TLS 证书
+    auto_upload: bool = True    # GUI/daemon 启动后是否启用定时上传
+    schedule_times: list[str] = field(default_factory=lambda: ["10:00", "18:00"])
+    start_hidden: bool = True   # GUI / autostart 是否隐藏启动
+    minimize_to_tray: bool = True  # 关闭窗口时是否进入系统托盘
 
     @property
     def login_url(self) -> str:
@@ -90,7 +138,6 @@ def load_config(config_path: str | None = None, overrides: dict | None = None) -
     """合并配置文件、环境变量与命令行覆盖项，返回 Config。"""
     data: dict = {}
 
-    # 1) 配置文件
     candidates = [Path(config_path)] if config_path else list(CONFIG_SEARCH_PATHS)
     for path in candidates:
         if path and path.exists():
@@ -98,28 +145,25 @@ def load_config(config_path: str | None = None, overrides: dict | None = None) -
                 data.update(json.load(fh))
             break
 
-    # 2) 环境变量
     for key, env_name in _ENV_MAP.items():
         if env_name in os.environ and os.environ[env_name] != "":
             data[key] = os.environ[env_name]
 
-    # 3) 命令行覆盖（仅非 None 值）
     if overrides:
         data.update({k: v for k, v in overrides.items() if v is not None})
 
-    # 类型规整
     valid = {f.name for f in fields(Config)}
     clean: dict = {}
     for key, value in data.items():
         if key not in valid:
             continue
-        if key in {"only_success", "verify_tls"}:
+        if key in {"only_success", "verify_tls", "auto_upload", "start_hidden", "minimize_to_tray"}:
             clean[key] = _coerce_bool(value)
         elif key in {"timeout"}:
             clean[key] = float(value)
         elif key in {"batch_size"}:
             clean[key] = int(value)
-        elif key == "app_types" and isinstance(value, str):
+        elif key in {"app_types", "schedule_times"} and isinstance(value, str):
             clean[key] = [s.strip() for s in value.split(",") if s.strip()]
         else:
             clean[key] = value
