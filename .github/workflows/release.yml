@@ -96,7 +96,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cc-usage-reporter-${{ matrix.os_name }}
-          path: cc_usage_reporter/release/cc-usage-reporter-v*-${{ matrix.os_name }}.*
+          path: cc_usage_reporter/release/cc-usage-reporter-*-${{ matrix.os_name }}.*
           if-no-files-found: error
 
   publish:
