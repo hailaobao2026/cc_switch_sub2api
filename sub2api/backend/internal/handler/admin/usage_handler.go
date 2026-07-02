@@ -130,12 +130,16 @@ type ExternalUsageTrendPoint struct {
 	ActualCost          float64 `json:"actual_cost"`
 }
 
-func buildExternalUsageWhereClause(c *gin.Context) (string, []any, error) {
+func buildExternalUsageWhereClause(c *gin.Context, scopedUserID *int64) (string, []any, error) {
 	conditions := []string{"1=1"}
 	args := make([]any, 0)
 	addCondition := func(condition string, value any) {
 		args = append(args, value)
 		conditions = append(conditions, condition)
+	}
+
+	if scopedUserID != nil {
+		addCondition("user_id = $"+strconv.Itoa(len(args)+1), *scopedUserID)
 	}
 
 	if value := strings.TrimSpace(c.Query("source")); value != "" {
@@ -721,6 +725,16 @@ func (h *UsageHandler) CancelCleanupTask(c *gin.Context) {
 // ExternalDaily handles listing external daily usage reported by sidecars.
 // GET /api/v1/admin/usage/external
 func (h *UsageHandler) ExternalDaily(c *gin.Context) {
+	h.externalDaily(c, nil)
+}
+
+// CurrentUserExternalDaily handles listing external daily usage for the current user.
+// GET /api/v1/usage/external
+func (h *UsageHandler) CurrentUserExternalDaily(c *gin.Context) {
+	h.externalDaily(c, nil)
+}
+
+func (h *UsageHandler) externalDaily(c *gin.Context, scopedUserID *int64) {
 	if h.db == nil {
 		response.InternalError(c, "external usage database is unavailable")
 		return
@@ -747,7 +761,7 @@ func (h *UsageHandler) ExternalDaily(c *gin.Context) {
 	if !ok {
 		orderColumn = "usage_date"
 	}
-	whereClause, args, err := buildExternalUsageWhereClause(c)
+	whereClause, args, err := buildExternalUsageWhereClause(c, scopedUserID)
 	if err != nil {
 		response.BadRequest(c, "Invalid start_date or end_date format, use YYYY-MM-DD")
 		return
@@ -793,12 +807,22 @@ func (h *UsageHandler) ExternalDaily(c *gin.Context) {
 // ExternalStats handles aggregated statistics for external daily usage reported by sidecars.
 // GET /api/v1/admin/usage/external/stats
 func (h *UsageHandler) ExternalStats(c *gin.Context) {
+	h.externalStats(c, nil)
+}
+
+// CurrentUserExternalStats handles aggregated external usage stats for the current user.
+// GET /api/v1/usage/external/stats
+func (h *UsageHandler) CurrentUserExternalStats(c *gin.Context) {
+	h.externalStats(c, nil)
+}
+
+func (h *UsageHandler) externalStats(c *gin.Context, scopedUserID *int64) {
 	if h.db == nil {
 		response.InternalError(c, "external usage database is unavailable")
 		return
 	}
 
-	whereClause, args, err := buildExternalUsageWhereClause(c)
+	whereClause, args, err := buildExternalUsageWhereClause(c, scopedUserID)
 	if err != nil {
 		response.BadRequest(c, "Invalid start_date or end_date format, use YYYY-MM-DD")
 		return
@@ -938,12 +962,22 @@ LIMIT 12`
 // ExternalTrend handles trend data for external daily usage reported by sidecars.
 // GET /api/v1/admin/usage/external/trend
 func (h *UsageHandler) ExternalTrend(c *gin.Context) {
+	h.externalTrend(c, nil)
+}
+
+// CurrentUserExternalTrend handles external usage trend data for the current user.
+// GET /api/v1/usage/external/trend
+func (h *UsageHandler) CurrentUserExternalTrend(c *gin.Context) {
+	h.externalTrend(c, nil)
+}
+
+func (h *UsageHandler) externalTrend(c *gin.Context, scopedUserID *int64) {
 	if h.db == nil {
 		response.InternalError(c, "external usage database is unavailable")
 		return
 	}
 
-	whereClause, args, err := buildExternalUsageWhereClause(c)
+	whereClause, args, err := buildExternalUsageWhereClause(c, scopedUserID)
 	if err != nil {
 		response.BadRequest(c, "Invalid start_date or end_date format, use YYYY-MM-DD")
 		return
@@ -1002,6 +1036,16 @@ ORDER BY usage_date ASC`
 // ExternalUsers handles user-aggregated statistics for external daily usage reported by sidecars.
 // GET /api/v1/admin/usage/external/users
 func (h *UsageHandler) ExternalUsers(c *gin.Context) {
+	h.externalUsers(c, nil)
+}
+
+// CurrentUserExternalUsers handles current-user aggregated external usage statistics.
+// GET /api/v1/usage/external/users
+func (h *UsageHandler) CurrentUserExternalUsers(c *gin.Context) {
+	h.externalUsers(c, nil)
+}
+
+func (h *UsageHandler) externalUsers(c *gin.Context, scopedUserID *int64) {
 	if h.db == nil {
 		response.InternalError(c, "external usage database is unavailable")
 		return
@@ -1035,7 +1079,7 @@ func (h *UsageHandler) ExternalUsers(c *gin.Context) {
 		orderColumn = "total_cost"
 	}
 
-	whereClause, args, err := buildExternalUsageWhereClause(c)
+	whereClause, args, err := buildExternalUsageWhereClause(c, scopedUserID)
 	if err != nil {
 		response.BadRequest(c, "Invalid start_date or end_date format, use YYYY-MM-DD")
 		return

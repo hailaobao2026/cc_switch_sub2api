@@ -92,7 +92,7 @@
               <span class="input-label">结束日期</span>
               <input v-model="filters.end_date" type="date" class="input w-[180px]" @change="handleDateChange" />
             </label>
-            <label class="min-w-[240px] flex-1 space-y-1">
+            <label v-if="isAdminView" class="min-w-[240px] flex-1 space-y-1">
               <span class="input-label">用户</span>
               <input
                 v-model.trim="filters.user"
@@ -342,12 +342,12 @@
         </div>
       </div>
 
-      <div class="mb-4 flex gap-2 border-b border-gray-200 dark:border-dark-700">
+      <div v-if="isAdminView" class="mb-4 flex gap-2 border-b border-gray-200 dark:border-dark-700">
         <button class="tab" :class="{ 'tab-active': activeTab === 'users' }" @click="activeTab = 'users'">用户汇总</button>
         <button class="tab" :class="{ 'tab-active': activeTab === 'detail' }" @click="activeTab = 'detail'">用量明细</button>
       </div>
 
-      <div v-if="activeTab === 'users'" class="card overflow-hidden">
+      <div v-if="!isAdminView || activeTab === 'users'" class="card overflow-hidden">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-4 dark:border-dark-700">
           <div>
             <h2 class="text-base font-semibold text-gray-900 dark:text-white">按用户汇总统计</h2>
@@ -423,7 +423,7 @@
         </div>
       </div>
 
-      <div v-else class="card overflow-hidden">
+      <div v-else-if="isAdminView" class="card overflow-hidden">
         <div class="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-dark-700">
           <div>
             <h2 class="text-base font-semibold text-gray-900 dark:text-white">按桶明细</h2>
@@ -530,6 +530,7 @@ import ModelDistributionChart from '@/components/charts/ModelDistributionChart.v
 import EndpointDistributionChart from '@/components/charts/EndpointDistributionChart.vue'
 import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
 import { adminUsageAPI } from '@/api/admin/usage'
+import { usageAPI } from '@/api/usage'
 import type {
   ExternalUsageDailyRow,
   ExternalUsageQueryParams,
@@ -538,6 +539,7 @@ import type {
 } from '@/api/admin/usage'
 import type { TrendDataPoint } from '@/types'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 
 type DistributionMetric = 'tokens' | 'actual_cost'
 type QuickRangeValue = 'today' | 'week' | 'month' | 'all'
@@ -572,6 +574,9 @@ const rankingRows = ref<ExternalUsageUserSummaryRow[]>([])
 const userSummaryRows = ref<ExternalUsageUserSummaryRow[]>([])
 const externalStats = ref<ExternalUsageStatsResponse | null>(null)
 const trendData = ref<TrendDataPoint[]>([])
+const authStore = useAuthStore()
+const externalUsageAPI = computed(() => (authStore.isAdmin ? adminUsageAPI : usageAPI))
+const isAdminView = computed(() => authStore.isAdmin)
 
 const modelMetric = ref<DistributionMetric>('tokens')
 const appMetric = ref<DistributionMetric>('tokens')
@@ -630,7 +635,7 @@ const averageTokensPerUser = computed(() => {
 const buildQueryParams = (): ExternalUsageQueryParams => ({
   start_date: filters.start_date || undefined,
   end_date: filters.end_date || undefined,
-  user: filters.user || undefined,
+  user: isAdminView.value ? (filters.user || undefined) : undefined,
   source: filters.source || undefined,
   app_type: filters.app_type || undefined,
   model: filters.model || undefined,
@@ -705,8 +710,8 @@ const loadOverview = async () => {
   try {
     const params = buildQueryParams()
     const [stats, trend] = await Promise.all([
-      adminUsageAPI.getExternalStats(params),
-      adminUsageAPI.getExternalTrend(params),
+      externalUsageAPI.value.getExternalStats(params),
+      externalUsageAPI.value.getExternalTrend(params),
     ])
     externalStats.value = stats
     trendData.value = trend
@@ -721,7 +726,7 @@ const loadOverview = async () => {
 const loadData = async () => {
   detailLoading.value = true
   try {
-    const response = await adminUsageAPI.listExternal({
+    const response = await externalUsageAPI.value.listExternal({
       page: detailPagination.page,
       page_size: detailPagination.page_size,
       ...buildQueryParams(),
@@ -744,7 +749,7 @@ const loadData = async () => {
 const loadRanking = async () => {
   rankingLoading.value = true
   try {
-    const response = await adminUsageAPI.listExternalUsers(buildRankingQueryParams(1, 10))
+    const response = await externalUsageAPI.value.listExternalUsers(buildRankingQueryParams(1, 10))
     rankingRows.value = response.items || []
   } catch (error) {
     console.error('Failed to load external usage ranking:', error)
@@ -757,7 +762,7 @@ const loadRanking = async () => {
 const loadUserSummary = async () => {
   summaryLoading.value = true
   try {
-    const response = await adminUsageAPI.listExternalUsers({
+    const response = await externalUsageAPI.value.listExternalUsers({
       page: userPagination.page,
       page_size: userPagination.page_size,
       ...buildQueryParams(),
@@ -778,7 +783,14 @@ const loadUserSummary = async () => {
 }
 
 const refreshAll = async () => {
-  await Promise.all([loadOverview(), loadRanking(), loadUserSummary(), loadData()])
+  const tasks = [loadOverview(), loadRanking(), loadUserSummary()]
+  if (isAdminView.value) {
+    tasks.push(loadData())
+  } else {
+    rows.value = []
+    detailPagination.total = 0
+  }
+  await Promise.all(tasks)
 }
 
 const applyFilters = async () => {
@@ -851,7 +863,7 @@ const fetchAllRankingRows = async (): Promise<ExternalUsageUserSummaryRow[]> => 
   const items: ExternalUsageUserSummaryRow[] = []
 
   do {
-    const response = await adminUsageAPI.listExternalUsers(buildRankingQueryParams(page, pageSize))
+    const response = await externalUsageAPI.value.listExternalUsers(buildRankingQueryParams(page, pageSize))
     const batch = response.items || []
     items.push(...batch)
     total = response.total || items.length
@@ -978,6 +990,9 @@ const podiumLabel = (index: number) => {
 }
 
 onMounted(async () => {
+  if (!isAdminView.value) {
+    activeTab.value = 'users'
+  }
   await applyQuickRange('month')
 })
 </script>

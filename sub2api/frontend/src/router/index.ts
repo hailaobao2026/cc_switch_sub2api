@@ -218,6 +218,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/external-usage',
+    name: 'ExternalUsage',
+    component: () => import('@/views/admin/ExternalUsageView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'CC-Switch Usage',
+      titleKey: 'nav.externalUsage',
+      descriptionKey: 'usage.description'
+    }
+  },
+  {
     path: '/redeem',
     name: 'Redeem',
     component: () => import('@/views/user/RedeemView.vue'),
@@ -703,6 +715,7 @@ const navigationLoading = useNavigationLoadingState()
 // 延迟初始化预加载，传入 router 实例
 let routePrefetch: ReturnType<typeof useRoutePrefetch> | null = null
 const BACKEND_MODE_ALLOWED_PATHS = ['/login', '/key-usage', '/setup', '/payment/result', '/payment/airwallex', '/legal']
+const BACKEND_MODE_ALLOWED_AUTHENTICATED_USER_PATHS = ['/external-usage']
 const BACKEND_MODE_CALLBACK_PATHS = [
   '/auth/callback',
   '/auth/linuxdo/callback',
@@ -728,6 +741,12 @@ function isBackendModePublicRouteAllowed(path: string, hasPendingAuthSession: bo
   }
 
   return false
+}
+
+function isBackendModeAuthenticatedUserRouteAllowed(path: string): boolean {
+  return BACKEND_MODE_ALLOWED_AUTHENTICATED_USER_PATHS.some(
+    (allowedPath) => path === allowedPath || path.startsWith(allowedPath + '/')
+  )
 }
 
 router.beforeEach(async (to, _from, next) => {
@@ -862,6 +881,10 @@ router.beforeEach(async (to, _from, next) => {
   // Backend mode: admin gets full access, non-admin blocked
   if (appStore.backendModeEnabled) {
     if (authStore.isAuthenticated && authStore.isAdmin) {
+      next()
+      return
+    }
+    if (authStore.isAuthenticated && isBackendModeAuthenticatedUserRouteAllowed(to.path)) {
       next()
       return
     }

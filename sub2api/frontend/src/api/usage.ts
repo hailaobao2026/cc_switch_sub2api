@@ -11,6 +11,7 @@ import type {
   PaginatedResponse,
   TrendDataPoint,
   ModelStat,
+  EndpointStat,
   GroupStat,
   UsageRequestType,
   UserErrorRequest,
@@ -115,6 +116,75 @@ export interface UsageDashboardSnapshotV2Response {
   trend?: TrendDataPoint[]
   models?: ModelStat[]
   groups?: GroupStat[]
+}
+
+export interface ExternalUsageDailyRow {
+  user_id: number
+  username: string
+  email: string
+  source: string
+  usage_date: string
+  app_type: string
+  model: string
+  requested_model: string
+  request_count: number
+  success_count: number
+  input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_creation_tokens: number
+  total_tokens: number
+  total_cost: number
+  reported_at: string
+}
+
+export interface ExternalUsageQueryParams {
+  page?: number
+  page_size?: number
+  start_date?: string
+  end_date?: string
+  user?: string
+  source?: string
+  app_type?: string
+  model?: string
+  sort_by?: string
+  sort_order?: 'asc' | 'desc'
+}
+
+export interface ExternalUsageStatsResponse {
+  total_requests: number
+  total_success_requests: number
+  total_input_tokens: number
+  total_output_tokens: number
+  total_cache_read_tokens: number
+  total_cache_creation_tokens: number
+  total_tokens: number
+  total_cost: number
+  total_actual_cost: number
+  total_records: number
+  total_users: number
+  success_rate: number
+  models: ModelStat[]
+  apps: EndpointStat[]
+  sources: EndpointStat[]
+}
+
+export interface ExternalUsageUserSummaryRow {
+  user_id: number
+  username: string
+  email: string
+  active_days: number
+  models_count: number
+  app_types_count: number
+  request_count: number
+  success_count: number
+  input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_creation_tokens: number
+  total_tokens: number
+  total_cost: number
+  last_reported_at: string
 }
 
 /**
@@ -250,6 +320,50 @@ export async function getById(id: number): Promise<UsageLog> {
   return data
 }
 
+export async function listExternal(
+  params: ExternalUsageQueryParams,
+  options?: { signal?: AbortSignal }
+): Promise<PaginatedResponse<ExternalUsageDailyRow>> {
+  const { data } = await apiClient.get<PaginatedResponse<ExternalUsageDailyRow>>('/usage/external', {
+    params,
+    signal: options?.signal
+  })
+  return data
+}
+
+export async function getExternalStats(
+  params: ExternalUsageQueryParams,
+  options?: { signal?: AbortSignal }
+): Promise<ExternalUsageStatsResponse> {
+  const { data } = await apiClient.get<ExternalUsageStatsResponse>('/usage/external/stats', {
+    params,
+    signal: options?.signal
+  })
+  return data
+}
+
+export async function getExternalTrend(
+  params: ExternalUsageQueryParams,
+  options?: { signal?: AbortSignal }
+): Promise<TrendDataPoint[]> {
+  const { data } = await apiClient.get<TrendDataPoint[]>('/usage/external/trend', {
+    params,
+    signal: options?.signal
+  })
+  return data
+}
+
+export async function listExternalUsers(
+  params: ExternalUsageQueryParams,
+  options?: { signal?: AbortSignal }
+): Promise<PaginatedResponse<ExternalUsageUserSummaryRow>> {
+  const { data } = await apiClient.get<PaginatedResponse<ExternalUsageUserSummaryRow>>('/usage/external/users', {
+    params,
+    signal: options?.signal
+  })
+  return data
+}
+
 // ==================== Dashboard API ====================
 
 /**
@@ -375,6 +489,10 @@ export const usageAPI = {
   getStatsByDateRange,
   getByDateRange,
   getById,
+  listExternal,
+  getExternalStats,
+  getExternalTrend,
+  listExternalUsers,
   // Dashboard
   getDashboardStats,
   getDashboardTrend,

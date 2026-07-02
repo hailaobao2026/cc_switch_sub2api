@@ -119,10 +119,10 @@
       </template>
 
       <!-- Regular User View -->
-      <template v-else-if="!appStore.backendModeEnabled">
+      <template v-else>
         <div class="sidebar-section">
           <router-link
-            v-for="item in userNavItems"
+            v-for="item in visibleUserNavItems"
             :key="item.path"
             :to="item.path"
             class="sidebar-link mb-1"
@@ -667,6 +667,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   items.push(
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
+    { path: '/external-usage', label: t('nav.externalUsage'), icon: ChartIcon },
     { path: '/available-channels', label: t('nav.availableChannels'), icon: ChannelIcon, hideInSimpleMode: true, featureFlag: flagAvailableChannels },
     { path: '/monitor', label: t('nav.channelStatus'), icon: SignalIcon, featureFlag: flagChannelMonitor },
     { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
@@ -693,6 +694,13 @@ function finalizeNav(items: NavItem[]): NavItem[] {
 
 // User navigation items (for regular users)
 const userNavItems = computed((): NavItem[] => finalizeNav(buildSelfNavItems(true)))
+const backendModeAllowedUserPaths = new Set(['/external-usage'])
+const visibleUserNavItems = computed((): NavItem[] => {
+  if (!appStore.backendModeEnabled) {
+    return userNavItems.value
+  }
+  return userNavItems.value.filter((item) => backendModeAllowedUserPaths.has(item.path))
+})
 
 // Personal navigation items (for admin's "My Account" section, without Dashboard).
 // Admins access 可用渠道 from this section just like regular users — there is no

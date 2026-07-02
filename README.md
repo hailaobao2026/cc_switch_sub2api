@@ -90,10 +90,21 @@ docker compose -f docker-compose.yml -f docker-compose.cc-switch-sidecar.yml up 
 /admin/external-usage
 ```
 
+普通用户也可以访问对应页面：
+
+```text
+/external-usage
+```
+
 这个页面基于 `external_usage_daily` 表和 `admin_external_usage_v` 视图，当前提供两层统计视角：
 
 - **用量明细**：保留 `user + usage_date + app_type + model + requested_model + source` 粒度，适合排查某天某模型的具体消耗。
 - **用户汇总**：对当前筛选范围内的多条桶数据再次按用户聚合，适合查看员工总体消耗情况。
+
+不同角色的页面能力如下：
+
+- **管理员**：可查看 `用户汇总` + `用量明细` 两个视角，并可按用户名 / 邮箱筛选指定用户。
+- **普通用户**：可查看排行榜、趋势图、分布图和 `用户汇总`，用于了解整体排名情况；默认不展示管理员排查用的明细 Tab。
 
 页面包含以下能力：
 
@@ -130,6 +141,15 @@ docker compose -f docker-compose.yml -f docker-compose.cc-switch-sidecar.yml up 
 GET /api/v1/admin/usage/external/users
 ```
 
+本次同时补充了普通用户接口：
+
+```text
+GET /api/v1/usage/external
+GET /api/v1/usage/external/stats
+GET /api/v1/usage/external/trend
+GET /api/v1/usage/external/users
+```
+
 接口返回的核心字段包括：
 
 - `active_days`
@@ -144,6 +164,23 @@ GET /api/v1/admin/usage/external/users
 - `total_tokens`
 - `total_cost`
 - `last_reported_at`
+
+### Backend Mode 兼容说明
+
+如果 sub2api 开启了 `backend mode`，本补丁额外放开了普通用户访问 `cc-switch` 排行模块所需的最小能力：
+
+- 前端普通用户侧边栏会显示 `CC-Switch Usage` 入口。
+- 前端路由守卫会允许普通用户访问 `/external-usage`。
+- 后端 `BackendModeUserGuard` 会精确放行以下接口：
+
+```text
+/api/v1/usage/external
+/api/v1/usage/external/stats
+/api/v1/usage/external/trend
+/api/v1/usage/external/users
+```
+
+也就是说，在 `backend mode` 下，普通用户不会恢复完整自助功能，只会被定向允许查看 `cc-switch` 排行与汇总页面。
 
 ## 升级策略
 
