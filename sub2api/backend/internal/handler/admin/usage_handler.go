@@ -83,21 +83,39 @@ type ExternalUsageDailyRow struct {
 }
 
 type ExternalUsageStatsResponse struct {
-	TotalRequests           int64                `json:"total_requests"`
-	TotalSuccessRequests    int64                `json:"total_success_requests"`
-	TotalInputTokens        int64                `json:"total_input_tokens"`
-	TotalOutputTokens       int64                `json:"total_output_tokens"`
-	TotalCacheReadTokens    int64                `json:"total_cache_read_tokens"`
-	TotalCacheCreationTokens int64               `json:"total_cache_creation_tokens"`
-	TotalTokens             int64                `json:"total_tokens"`
-	TotalCost               float64              `json:"total_cost"`
-	TotalActualCost         float64              `json:"total_actual_cost"`
-	TotalRecords            int64                `json:"total_records"`
-	TotalUsers              int64                `json:"total_users"`
-	SuccessRate             float64              `json:"success_rate"`
-	Models                  []usagestats.ModelStat    `json:"models"`
-	Apps                    []usagestats.EndpointStat `json:"apps"`
-	Sources                 []usagestats.EndpointStat `json:"sources"`
+	TotalRequests            int64                     `json:"total_requests"`
+	TotalSuccessRequests     int64                     `json:"total_success_requests"`
+	TotalInputTokens         int64                     `json:"total_input_tokens"`
+	TotalOutputTokens        int64                     `json:"total_output_tokens"`
+	TotalCacheReadTokens     int64                     `json:"total_cache_read_tokens"`
+	TotalCacheCreationTokens int64                     `json:"total_cache_creation_tokens"`
+	TotalTokens              int64                     `json:"total_tokens"`
+	TotalCost                float64                   `json:"total_cost"`
+	TotalActualCost          float64                   `json:"total_actual_cost"`
+	TotalRecords             int64                     `json:"total_records"`
+	TotalUsers               int64                     `json:"total_users"`
+	SuccessRate              float64                   `json:"success_rate"`
+	Models                   []usagestats.ModelStat    `json:"models"`
+	Apps                     []usagestats.EndpointStat `json:"apps"`
+	Sources                  []usagestats.EndpointStat `json:"sources"`
+}
+
+type ExternalUsageUserSummaryRow struct {
+	UserID              int64   `json:"user_id"`
+	Username            string  `json:"username"`
+	Email               string  `json:"email"`
+	ActiveDays          int64   `json:"active_days"`
+	ModelsCount         int64   `json:"models_count"`
+	AppTypesCount       int64   `json:"app_types_count"`
+	RequestCount        int64   `json:"request_count"`
+	SuccessCount        int64   `json:"success_count"`
+	InputTokens         int64   `json:"input_tokens"`
+	OutputTokens        int64   `json:"output_tokens"`
+	CacheReadTokens     int64   `json:"cache_read_tokens"`
+	CacheCreationTokens int64   `json:"cache_creation_tokens"`
+	TotalTokens         int64   `json:"total_tokens"`
+	TotalCost           float64 `json:"total_cost"`
+	LastReportedAt      string  `json:"last_reported_at"`
 }
 
 type ExternalUsageTrendPoint struct {
@@ -979,4 +997,146 @@ ORDER BY usage_date ASC`
 	}
 
 	response.Success(c, items)
+}
+
+// ExternalUsers handles user-aggregated statistics for external daily usage reported by sidecars.
+// GET /api/v1/admin/usage/external/users
+func (h *UsageHandler) ExternalUsers(c *gin.Context) {
+	if h.db == nil {
+		response.InternalError(c, "external usage database is unavailable")
+		return
+	}
+
+	page, pageSize := response.ParsePagination(c)
+	offset := (page - 1) * pageSize
+	sortBy := c.DefaultQuery("sort_by", "total_cost")
+	sortOrder := strings.ToLower(c.DefaultQuery("sort_order", "desc"))
+	if sortOrder != "asc" {
+		sortOrder = "desc"
+	}
+	sortColumns := map[string]string{
+		"username":              "username",
+		"email":                 "email",
+		"active_days":           "active_days",
+		"models_count":          "models_count",
+		"app_types_count":       "app_types_count",
+		"request_count":         "request_count",
+		"success_count":         "success_count",
+		"input_tokens":          "input_tokens",
+		"output_tokens":         "output_tokens",
+		"cache_read_tokens":     "cache_read_tokens",
+		"cache_creation_tokens": "cache_creation_tokens",
+		"total_tokens":          "total_tokens",
+		"total_cost":            "total_cost",
+		"last_reported_at":      "last_reported_at",
+	}
+	orderColumn, ok := sortColumns[sortBy]
+	if !ok {
+		orderColumn = "total_cost"
+	}
+
+	whereClause, args, err := buildExternalUsageWhereClause(c)
+	if err != nil {
+		response.BadRequest(c, "Invalid start_date or end_date format, use YYYY-MM-DD")
+		return
+	}
+
+	countQuery := `
+SELECT COUNT(*)
+FROM (
+  SELECT user_id, COALESCE(username, ''), COALESCE(email, '')
+  FROM admin_external_usage_v
+  WHERE ` + whereClause + `
+  GROUP BY user_id, COALESCE(username, ''), COALESCE(email, '')
+) AS grouped_users`
+	var total int64
+	if err := h.db.QueryRowContext(c.Request.Context(), countQuery, args...).Scan(&total); err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+
+	queryArgs := append(args, pageSize, offset)
+	limitParam := len(args) + 1
+	offsetParam := len(args) + 2
+	query := `
+WITH aggregated AS (
+  SELECT
+    user_id,
+    COALESCE(username, '') AS username,
+    COALESCE(email, '') AS email,
+    COUNT(DISTINCT usage_date) AS active_days,
+    COUNT(DISTINCT model) AS models_count,
+    COUNT(DISTINCT app_type) AS app_types_count,
+    COALESCE(SUM(request_count), 0) AS request_count,
+    COALESCE(SUM(success_count), 0) AS success_count,
+    COALESCE(SUM(input_tokens), 0) AS input_tokens,
+    COALESCE(SUM(output_tokens), 0) AS output_tokens,
+    COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
+    COALESCE(SUM(cache_creation_tokens), 0) AS cache_creation_tokens,
+    COALESCE(SUM(input_tokens + output_tokens + cache_read_tokens + cache_creation_tokens), 0) AS total_tokens,
+    COALESCE(SUM(total_cost::float8), 0) AS total_cost,
+    MAX(reported_at) AS last_reported_at
+  FROM admin_external_usage_v
+  WHERE ` + whereClause + `
+  GROUP BY user_id, COALESCE(username, ''), COALESCE(email, '')
+)
+SELECT
+  user_id,
+  username,
+  email,
+  active_days,
+  models_count,
+  app_types_count,
+  request_count,
+  success_count,
+  input_tokens,
+  output_tokens,
+  cache_read_tokens,
+  cache_creation_tokens,
+  total_tokens,
+  total_cost,
+  last_reported_at
+FROM aggregated
+ORDER BY ` + orderColumn + ` ` + sortOrder + `, user_id ASC
+LIMIT $` + strconv.Itoa(limitParam) + ` OFFSET $` + strconv.Itoa(offsetParam)
+	rows, err := h.db.QueryContext(c.Request.Context(), query, queryArgs...)
+	if err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+	defer rows.Close()
+
+	items := make([]ExternalUsageUserSummaryRow, 0, pageSize)
+	for rows.Next() {
+		var item ExternalUsageUserSummaryRow
+		var lastReportedAt time.Time
+		if err := rows.Scan(
+			&item.UserID,
+			&item.Username,
+			&item.Email,
+			&item.ActiveDays,
+			&item.ModelsCount,
+			&item.AppTypesCount,
+			&item.RequestCount,
+			&item.SuccessCount,
+			&item.InputTokens,
+			&item.OutputTokens,
+			&item.CacheReadTokens,
+			&item.CacheCreationTokens,
+			&item.TotalTokens,
+			&item.TotalCost,
+			&lastReportedAt,
+		); err != nil {
+			response.InternalError(c, err.Error())
+			return
+		}
+		item.LastReportedAt = lastReportedAt.Format(time.RFC3339)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+
+	response.Paginated(c, items, total, page, pageSize)
 }

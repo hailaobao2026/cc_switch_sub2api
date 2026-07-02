@@ -82,6 +82,69 @@ docker compose -f docker-compose.yml -f docker-compose.cc-switch-sidecar.yml up 
 - Windows EXE 打包：[`cc_usage_reporter/README.md`](./cc_usage_reporter/README.md#打包为-windows-exe)
 - 嵌入式参考补丁：[`backend_patch/README.md`](./backend_patch/README.md)
 
+## 管理端统计页面
+
+完成 sidecar 部署并使用本地补丁版 `sub2api:cc-switch-local` 镜像后，可以在管理端访问：
+
+```text
+/admin/external-usage
+```
+
+这个页面基于 `external_usage_daily` 表和 `admin_external_usage_v` 视图，当前提供两层统计视角：
+
+- **用量明细**：保留 `user + usage_date + app_type + model + requested_model + source` 粒度，适合排查某天某模型的具体消耗。
+- **用户汇总**：对当前筛选范围内的多条桶数据再次按用户聚合，适合查看员工总体消耗情况。
+
+页面包含以下能力：
+
+- 顶部总览卡片：总请求数、总 Token、总消费、总用户数、成功率。
+- 模型 / 应用 / 来源分布图。
+- 按日期聚合的趋势图。
+- **用户消费排行榜**：默认按总消费降序展示 Top 10。
+- **排行榜周期切换**：支持 `日榜 / 月榜 / 年榜`。
+- **排行榜 CSV 导出**：导出当前榜单周期下的完整用户排行。
+- **用户汇总表**：展示活跃天数、模型数、应用数、请求数、成功率、总 Token、总费用、最近上报时间。
+
+排行榜和用户汇总均支持复用页面筛选条件：
+
+- 时间范围
+- 用户（用户名 / 邮箱）
+- 模型
+- 应用类型
+- 来源
+
+其中排行榜额外支持独立周期切换：
+
+- `日榜`：取锚点日期当天数据
+- `月榜`：取锚点日期所在自然月数据
+- `年榜`：取锚点日期所在自然年数据
+
+说明：
+
+- 排行榜的锚点日期优先取页面的 `结束日期`；如果未设置，则使用当天日期。
+- CSV 导出内容不仅限于 Top 10，而是导出当前榜单周期下的完整用户排行。
+
+当前新增的用户聚合接口为：
+
+```text
+GET /api/v1/admin/usage/external/users
+```
+
+接口返回的核心字段包括：
+
+- `active_days`
+- `models_count`
+- `app_types_count`
+- `request_count`
+- `success_count`
+- `input_tokens`
+- `output_tokens`
+- `cache_read_tokens`
+- `cache_creation_tokens`
+- `total_tokens`
+- `total_cost`
+- `last_reported_at`
+
 ## 升级策略
 
 推荐长期保持 sidecar 独立运行，不改 sub2api 主仓库。sub2api 升级时，只需确认 PostgreSQL 连接和 `users` 表核心字段仍存在：`id`、`email`、`username`、`deleted_at`。

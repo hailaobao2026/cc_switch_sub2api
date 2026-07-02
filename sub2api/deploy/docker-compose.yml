@@ -207,6 +207,8 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       - POSTGRES_DB=${POSTGRES_DB:-sub2api}
       - TZ=${TZ:-Asia/Shanghai}
+    ports:
+      - "15432:5432"
     networks:
       - sub2api-network
     healthcheck:
@@ -219,8 +221,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    # 注意：不暴露端口到宿主机，应用通过内部网络连接
-    # 如需调试，可临时添加：ports: ["127.0.0.1:5433:5432"]
+    # 注意：这里已将 PostgreSQL 暴露到宿主机 15432，便于外部数据库工具连接
 
   # ===========================================================================
   # Redis Cache

@@ -575,6 +575,7 @@ func registerUsageRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		usage.GET("/external", h.Admin.Usage.ExternalDaily)
 		usage.GET("/external/stats", h.Admin.Usage.ExternalStats)
 		usage.GET("/external/trend", h.Admin.Usage.ExternalTrend)
+		usage.GET("/external/users", h.Admin.Usage.ExternalUsers)
 		usage.GET("/stats", h.Admin.Usage.Stats)
 		usage.GET("/search-users", h.Admin.Usage.SearchUsers)
 		usage.GET("/search-api-keys", h.Admin.Usage.SearchAPIKeys)

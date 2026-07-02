@@ -139,6 +139,24 @@ export interface ExternalUsageStatsResponse {
   sources: EndpointStat[]
 }
 
+export interface ExternalUsageUserSummaryRow {
+  user_id: number
+  username: string
+  email: string
+  active_days: number
+  models_count: number
+  app_types_count: number
+  request_count: number
+  success_count: number
+  input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_creation_tokens: number
+  total_tokens: number
+  total_cost: number
+  last_reported_at: string
+}
+
 // ==================== API Functions ====================
 
 /**
@@ -184,6 +202,17 @@ export async function getExternalTrend(
   options?: { signal?: AbortSignal }
 ): Promise<TrendDataPoint[]> {
   const { data } = await apiClient.get<TrendDataPoint[]>('/admin/usage/external/trend', {
+    params,
+    signal: options?.signal
+  })
+  return data
+}
+
+export async function listExternalUsers(
+  params: ExternalUsageQueryParams,
+  options?: { signal?: AbortSignal }
+): Promise<PaginatedResponse<ExternalUsageUserSummaryRow>> {
+  const { data } = await apiClient.get<PaginatedResponse<ExternalUsageUserSummaryRow>>('/admin/usage/external/users', {
     params,
     signal: options?.signal
   })
@@ -289,6 +318,7 @@ export const adminUsageAPI = {
   listExternal,
   getExternalStats,
   getExternalTrend,
+  listExternalUsers,
   getStats,
   searchUsers,
   searchApiKeys,
