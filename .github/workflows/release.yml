@@ -32,6 +32,9 @@ jobs:
           - runner: macos-latest
             os_name: macos
             archive_ext: tar.gz
+          - runner: macos-13
+            os_name: macos-intel
+            archive_ext: tar.gz
 
     steps:
       - name: Checkout
@@ -122,3 +125,4 @@ jobs:
             artifacts/cc-usage-reporter-linux/*
             artifacts/cc-usage-reporter-linux-ubuntu22/*
             artifacts/cc-usage-reporter-macos/*
+            artifacts/cc-usage-reporter-macos-intel/*
