@@ -92,7 +92,7 @@
               <span class="input-label">结束日期</span>
               <input v-model="filters.end_date" type="date" class="input w-[180px]" @change="handleDateChange" />
             </label>
-            <label v-if="isAdminView" class="min-w-[240px] flex-1 space-y-1">
+            <label class="min-w-[240px] flex-1 space-y-1">
               <span class="input-label">用户</span>
               <input
                 v-model.trim="filters.user"
@@ -342,12 +342,12 @@
         </div>
       </div>
 
-      <div v-if="isAdminView" class="mb-4 flex gap-2 border-b border-gray-200 dark:border-dark-700">
+      <div class="mb-4 flex gap-2 border-b border-gray-200 dark:border-dark-700">
         <button class="tab" :class="{ 'tab-active': activeTab === 'users' }" @click="activeTab = 'users'">用户汇总</button>
         <button class="tab" :class="{ 'tab-active': activeTab === 'detail' }" @click="activeTab = 'detail'">用量明细</button>
       </div>
 
-      <div v-if="!isAdminView || activeTab === 'users'" class="card overflow-hidden">
+      <div v-if="activeTab === 'users'" class="card overflow-hidden">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-4 dark:border-dark-700">
           <div>
             <h2 class="text-base font-semibold text-gray-900 dark:text-white">按用户汇总统计</h2>
@@ -423,7 +423,7 @@
         </div>
       </div>
 
-      <div v-else-if="isAdminView" class="card overflow-hidden">
+      <div v-else class="card overflow-hidden">
         <div class="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-dark-700">
           <div>
             <h2 class="text-base font-semibold text-gray-900 dark:text-white">按桶明细</h2>
@@ -560,6 +560,7 @@ const rankingPeriodOptions: Array<{ label: string; value: RankingPeriod }> = [
 ]
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const detailLoading = ref(false)
 const statsLoading = ref(false)
 const summaryLoading = ref(false)
@@ -574,9 +575,7 @@ const rankingRows = ref<ExternalUsageUserSummaryRow[]>([])
 const userSummaryRows = ref<ExternalUsageUserSummaryRow[]>([])
 const externalStats = ref<ExternalUsageStatsResponse | null>(null)
 const trendData = ref<TrendDataPoint[]>([])
-const authStore = useAuthStore()
 const externalUsageAPI = computed(() => (authStore.isAdmin ? adminUsageAPI : usageAPI))
-const isAdminView = computed(() => authStore.isAdmin)
 
 const modelMetric = ref<DistributionMetric>('tokens')
 const appMetric = ref<DistributionMetric>('tokens')
@@ -635,7 +634,7 @@ const averageTokensPerUser = computed(() => {
 const buildQueryParams = (): ExternalUsageQueryParams => ({
   start_date: filters.start_date || undefined,
   end_date: filters.end_date || undefined,
-  user: isAdminView.value ? (filters.user || undefined) : undefined,
+  user: filters.user || undefined,
   source: filters.source || undefined,
   app_type: filters.app_type || undefined,
   model: filters.model || undefined,
@@ -783,13 +782,7 @@ const loadUserSummary = async () => {
 }
 
 const refreshAll = async () => {
-  const tasks = [loadOverview(), loadRanking(), loadUserSummary()]
-  if (isAdminView.value) {
-    tasks.push(loadData())
-  } else {
-    rows.value = []
-    detailPagination.total = 0
-  }
+  const tasks = [loadOverview(), loadRanking(), loadUserSummary(), loadData()]
   await Promise.all(tasks)
 }
 
@@ -990,9 +983,6 @@ const podiumLabel = (index: number) => {
 }
 
 onMounted(async () => {
-  if (!isAdminView.value) {
-    activeTab.value = 'users'
-  }
   await applyQuickRange('month')
 })
 </script>

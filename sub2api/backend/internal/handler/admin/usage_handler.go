@@ -728,9 +728,9 @@ func (h *UsageHandler) ExternalDaily(c *gin.Context) {
 	h.externalDaily(c, nil)
 }
 
-// CurrentUserExternalDaily handles listing external daily usage for the current user.
+// AuthenticatedExternalDaily handles listing shared external daily usage for any authenticated user.
 // GET /api/v1/usage/external
-func (h *UsageHandler) CurrentUserExternalDaily(c *gin.Context) {
+func (h *UsageHandler) AuthenticatedExternalDaily(c *gin.Context) {
 	h.externalDaily(c, nil)
 }
 
@@ -810,9 +810,9 @@ func (h *UsageHandler) ExternalStats(c *gin.Context) {
 	h.externalStats(c, nil)
 }
 
-// CurrentUserExternalStats handles aggregated external usage stats for the current user.
+// AuthenticatedExternalStats handles shared external usage stats for any authenticated user.
 // GET /api/v1/usage/external/stats
-func (h *UsageHandler) CurrentUserExternalStats(c *gin.Context) {
+func (h *UsageHandler) AuthenticatedExternalStats(c *gin.Context) {
 	h.externalStats(c, nil)
 }
 
@@ -965,9 +965,9 @@ func (h *UsageHandler) ExternalTrend(c *gin.Context) {
 	h.externalTrend(c, nil)
 }
 
-// CurrentUserExternalTrend handles external usage trend data for the current user.
+// AuthenticatedExternalTrend handles shared external usage trend data for any authenticated user.
 // GET /api/v1/usage/external/trend
-func (h *UsageHandler) CurrentUserExternalTrend(c *gin.Context) {
+func (h *UsageHandler) AuthenticatedExternalTrend(c *gin.Context) {
 	h.externalTrend(c, nil)
 }
 
@@ -1039,9 +1039,9 @@ func (h *UsageHandler) ExternalUsers(c *gin.Context) {
 	h.externalUsers(c, nil)
 }
 
-// CurrentUserExternalUsers handles current-user aggregated external usage statistics.
+// AuthenticatedExternalUsers handles shared user-aggregated external usage statistics for any authenticated user.
 // GET /api/v1/usage/external/users
-func (h *UsageHandler) CurrentUserExternalUsers(c *gin.Context) {
+func (h *UsageHandler) AuthenticatedExternalUsers(c *gin.Context) {
 	h.externalUsers(c, nil)
 }
 
