@@ -65,8 +65,9 @@ class ReporterApp:
         self._add_entry(form, "token", "Token", row=2, width=72, show="*")
         self._add_entry(form, "email", "邮箱", row=3, width=32)
         self._add_entry(form, "username", "用户名", row=3, column=2, width=24)
-        self._add_entry(form, "state_path", "状态文件", row=4, width=72)
-        ttk.Button(form, text="选择...", command=self._pick_state).grid(row=4, column=2, padx=(8, 0), sticky="w")
+        self._add_entry(form, "source", "来源标识", row=4, width=32)
+        self._add_entry(form, "state_path", "状态文件", row=5, width=72)
+        ttk.Button(form, text="选择...", command=self._pick_state).grid(row=5, column=2, padx=(8, 0), sticky="w")
 
         self.fields["verify_tls"] = tk.BooleanVar(value=True)
         self.fields["only_success"] = tk.BooleanVar(value=True)
@@ -76,13 +77,13 @@ class ReporterApp:
         self.fields["minimize_to_tray"] = tk.BooleanVar(value=True)
 
         opts = ttk.Frame(form)
-        opts.grid(row=5, column=0, columnspan=4, sticky="w", pady=(10, 0))
+        opts.grid(row=6, column=0, columnspan=4, sticky="w", pady=(10, 0))
         ttk.Checkbutton(opts, text="校验 TLS 证书", variable=self.fields["verify_tls"]).pack(side=tk.LEFT, padx=(0, 16))
         ttk.Checkbutton(opts, text="仅统计成功请求", variable=self.fields["only_success"]).pack(side=tk.LEFT, padx=(0, 16))
         ttk.Checkbutton(opts, text="启动后后台定时上传", variable=self.fields["auto_upload"], command=self._restart_scheduler).pack(side=tk.LEFT)
 
         schedule = ttk.Frame(form)
-        schedule.grid(row=6, column=0, columnspan=4, sticky="ew", pady=(10, 0))
+        schedule.grid(row=7, column=0, columnspan=4, sticky="ew", pady=(10, 0))
         ttk.Label(schedule, text="定时上传时间").pack(side=tk.LEFT)
         ttk.Entry(schedule, textvariable=self.fields["schedule_times"], width=30).pack(side=tk.LEFT, padx=(8, 8))
         ttk.Label(schedule, text="多个时间用英文逗号分隔，例如 10:00,18:00").pack(side=tk.LEFT)
@@ -178,6 +179,7 @@ class ReporterApp:
             "token": self.fields["token"].get().strip(),
             "email": self.fields["email"].get().strip(),
             "username": self.fields["username"].get().strip(),
+            "source": self.fields["source"].get().strip() or "cc-switch",
             "state_path": self.fields["state_path"].get().strip(),
             "verify_tls": bool(self.fields["verify_tls"].get()),
             "only_success": bool(self.fields["only_success"].get()),
@@ -196,6 +198,8 @@ class ReporterApp:
                 raise ValueError("请填写 token")
             if not data["email"] and not data["username"]:
                 raise ValueError("请至少填写邮箱或用户名")
+            if not data["source"]:
+                raise ValueError("请填写来源标识")
             parse_schedule_times(data["schedule_times"])
         return data
 
@@ -211,6 +215,7 @@ class ReporterApp:
             "token": data["token"],
             "email": data["email"],
             "username": data["username"],
+            "source": data["source"],
             "db_path": data["db_path"],
             "state_path": data["state_path"],
             "verify_tls": data["verify_tls"],
@@ -236,6 +241,7 @@ class ReporterApp:
             "token": data["token"],
             "email": data["email"],
             "username": data["username"],
+            "source": data["source"],
             "db_path": data["db_path"],
             "state_path": data["state_path"],
             "verify_tls": data["verify_tls"],

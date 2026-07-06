@@ -41,6 +41,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--email", help="sub2api 登录邮箱")
     p.add_argument("--password", help="sub2api 登录密码")
     p.add_argument("--token", help="直接提供 Bearer token（跳过登录）")
+    p.add_argument("--source", help="上报来源；多电脑同用户建议每台配置不同值，如 cc-switch-laptop")
     p.add_argument("--db-path", dest="db_path", help="cc-switch.db 路径")
     p.add_argument("--state-path", dest="state_path", help="状态文件路径")
     p.add_argument("--report-path", dest="report_path", help="上报接口路径")
@@ -103,6 +104,7 @@ def main(argv: list[str] | None = None) -> int:
         "email": args.email,
         "password": args.password,
         "token": args.token,
+        "source": args.source,
         "db_path": args.db_path,
         "state_path": args.state_path,
         "report_path": args.report_path,

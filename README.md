@@ -40,6 +40,26 @@ CC Switch 的「当天」聚合桶会随请求持续累加，所以：
 - sidecar 按 `(user_id, source, usage_date, app_type, model, requested_model)` 唯一键 `ON CONFLICT DO UPDATE`。
 - 重复上报覆盖而非累加，不会重复计数。
 
+### 多电脑同用户
+
+如果同一个 sub2api 用户在多台电脑上安装 `cc_usage_reporter`，请给每台电脑配置不同 `source`，例如：
+
+```json
+{
+  "source": "cc-switch-pc-a"
+}
+```
+
+并在 sidecar 的 `allowed_sources` 中加入这些来源：
+
+```json
+{
+  "allowed_sources": ["cc-switch", "cc-switch-pc-a", "cc-switch-laptop"]
+}
+```
+
+原因是 `source` 是服务端唯一键的一部分。多台电脑如果都使用默认 `source = cc-switch`，同一天同用户同模型的桶会互相覆盖；使用不同 `source` 后，服务端会保留多行，管理端按用户汇总时会自然叠加。
+
 ## 快速上手
 
 ### 本地运行
@@ -57,7 +77,7 @@ python -m cc_usage_reporter preview
 
 # 3) 客户端上报到 sidecar
 Copy-Item config.sidecar.example.json config.sidecar.json
-# 编辑 username/email/token/db_path
+# 编辑 username/email/token/db_path/source
 python -m cc_usage_reporter run --config config.sidecar.json --dry-run
 python -m cc_usage_reporter run --config config.sidecar.json
 ```

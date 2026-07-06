@@ -73,6 +73,7 @@ _ENV_MAP = {
     "email": "SUB2API_EMAIL",
     "password": "SUB2API_PASSWORD",
     "token": "SUB2API_TOKEN",
+    "source": "CC_USAGE_SOURCE",
     "report_path": "SUB2API_REPORT_PATH",
     "login_path": "SUB2API_LOGIN_PATH",
     "db_path": "CC_SWITCH_DB_PATH",
@@ -93,6 +94,7 @@ class Config:
     email: str = ""      # sub2api 登录邮箱（登录用）
     password: str = ""   # sub2api 登录密码（登录用）
     token: str = ""      # 直接提供 JWT/Bearer（提供则跳过登录）
+    source: str = "cc-switch"  # 上报来源；多电脑同用户建议每台配置不同值
 
     # --- 本地数据 ---
     db_path: str = str(DEFAULT_DB_PATH)
@@ -124,6 +126,8 @@ class Config:
             raise ValueError("需提供 token，或 email+password 用于登录")
         if not self.username and not self.email:
             raise ValueError("需提供 username 或 email 用于关联 sub2api 用户")
+        if not self.source.strip():
+            raise ValueError("source 不能为空")
         if not Path(self.db_path).exists():
             raise FileNotFoundError(f"找不到数据库: {self.db_path}")
 

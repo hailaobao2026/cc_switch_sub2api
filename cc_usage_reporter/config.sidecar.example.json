@@ -4,6 +4,7 @@
   "username": "alice",
   "email": "alice@example.com",
   "token": "change-me-to-the-same-long-random-token-as-sidecar",
+  "source": "cc-switch",
   "db_path": "/home/alice/.config/cc-switch/cc-switch.db",
   "state_path": "/home/alice/.config/cc-switch/usage_reporter_state.json",
   "verify_tls": true,

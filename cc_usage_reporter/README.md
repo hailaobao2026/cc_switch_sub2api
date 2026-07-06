@@ -57,6 +57,7 @@ Copy-Item config.sidecar.example.json config.sidecar.json
   "base_url": "http://127.0.0.1:8788",
   "token": "与 sidecar report_token 一致的长随机 token",
   "username": "alice",
+  "source": "cc-switch",
   "db_path": "/home/alice/.config/cc-switch/cc-switch.db"
 }
 ```
@@ -79,6 +80,7 @@ python -m cc_usage_reporter run --config config.sidecar.json
 | `email` | `SUB2API_EMAIL` | 关联邮箱；sidecar 可用它解析用户 |
 | `password` | `SUB2API_PASSWORD` | 旧登录模式使用；sidecar 模式通常留空 |
 | `token` | `SUB2API_TOKEN` | Bearer token；sidecar 模式必须与 `report_token` 一致 |
+| `source` | `CC_USAGE_SOURCE` | 上报来源，默认 `cc-switch`；多电脑同用户建议每台配置不同值 |
 | `report_path` | `SUB2API_REPORT_PATH` | 默认 `/api/v1/usage/report` |
 | `login_path` | `SUB2API_LOGIN_PATH` | 旧登录模式使用，默认 `/api/v1/auth/login` |
 | `db_path` | `CC_SWITCH_DB_PATH` | 默认按系统自动选择：Windows `%APPDATA%\cc-switch`；Linux `~/.config/cc-switch`；macOS `~/Library/Application Support/cc-switch`；同时兼容旧 `~/.cc-switch` |
@@ -86,6 +88,35 @@ python -m cc_usage_reporter run --config config.sidecar.json
 | `app_types` | — | 默认 `['claude', 'codex']` |
 | `only_success` | — | 仅上报 2xx 请求（`--all` 可包含失败） |
 | `verify_tls` | `SUB2API_VERIFY_TLS` | HTTPS 自签名证书可设 false / `--no-verify-tls` |
+
+## 多电脑同用户上报
+
+服务端按 `(user_id, source, usage_date, app_type, model, requested_model)` 做幂等 upsert。
+
+如果多台电脑使用同一个 sub2api 用户，并且都使用默认 `source = cc-switch`，同一天同模型的桶会写到同一行，后上传的电脑会覆盖前一台电脑的累计值。
+
+要让多台电脑的数据叠加统计，请给每台电脑配置不同 `source`：
+
+```json
+{
+  "source": "cc-switch-pc-a"
+}
+```
+
+也可以用命令行或环境变量覆盖：
+
+```bash
+python -m cc_usage_reporter run --config config.sidecar.json --source cc-switch-laptop
+CC_USAGE_SOURCE=cc-switch-laptop python -m cc_usage_reporter run --config config.sidecar.json
+```
+
+同时需要在 sidecar 的 `allowed_sources` 中加入这些来源，例如：
+
+```json
+{
+  "allowed_sources": ["cc-switch", "cc-switch-pc-a", "cc-switch-laptop"]
+}
+```
 
 
 
@@ -125,7 +156,7 @@ python -m cc_usage_reporter run --db-path "/custom/path/cc-switch.db"
 | `autostart-uninstall` | 移除开机自启 |
 | `autostart-status` | 查看开机自启状态 |
 
-常用参数：`--config` `--base-url` `--username` `--email` `--password` `--token` `--db-path` `--state-path` `--all` `--no-verify-tls` `--no-incremental`。
+常用参数：`--config` `--base-url` `--username` `--email` `--password` `--token` `--source` `--db-path` `--state-path` `--all` `--no-verify-tls` `--no-incremental`。
 
 ## 打包与分发（Windows / Linux / macOS）
 

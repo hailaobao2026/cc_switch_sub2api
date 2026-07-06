@@ -31,7 +31,7 @@ Copy-Item config.example.json config.json
 | `database_url` | sub2api PostgreSQL DSN |
 | `report_token` | 客户端上报专用长随机 token |
 | `auto_migrate` | 启动时自动建表/建视图 |
-| `allowed_sources` | 允许写入的来源，默认 `cc-switch` |
+| `allowed_sources` | 允许写入的来源，默认 `cc-switch`；多电脑同用户上报时需要加入每台电脑的 `source` |
 | `max_items` | 单次上报最大 item 数 |
 
 也支持环境变量覆盖：
@@ -77,9 +77,20 @@ docker compose -f docker-compose.yml -f docker-compose.cc-switch-sidecar.yml up 
 {
   "base_url": "http://127.0.0.1:8788",
   "token": "change-me-to-the-same-long-random-token-as-sidecar",
-  "username": "alice"
+  "username": "alice",
+  "source": "cc-switch"
 }
 ```
+
+如果同一个 sub2api 用户在多台电脑上安装客户端，请给每台电脑设置不同 `source`，并同步加入 sidecar 的 `allowed_sources`：
+
+```json
+{
+  "allowed_sources": ["cc-switch", "cc-switch-pc-a", "cc-switch-laptop"]
+}
+```
+
+否则多台电脑使用默认 `cc-switch` 时，同一天同模型的桶会互相覆盖，表现为最后一次上传的数据生效。
 
 然后运行：
 

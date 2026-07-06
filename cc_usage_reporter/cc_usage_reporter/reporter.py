@@ -35,7 +35,7 @@ def build_payload(cfg: Config, buckets: list[DailyModelUsage]) -> dict:
     return {
         "username": cfg.username or None,
         "email": cfg.email or None,
-        "source": "cc-switch",
+        "source": cfg.source.strip(),
         "granularity": "daily",
         "items": [b.to_payload() for b in buckets],
     }
@@ -71,10 +71,12 @@ def _run_locked(cfg: Config, state: State, *, dry_run: bool = False,
     # 去重：仅发送「新增」或「数值发生变化」的桶
     pending: list[DailyModelUsage] = []
     sig_map: dict[str, str] = {}
+    source_prefix = cfg.source.strip()
     for b in buckets:
         sig = _bucket_signature(b)
-        sig_map[b.dedup_key] = sig
-        if state.signature(b.dedup_key) != sig:
+        state_key = f"{source_prefix}|{b.dedup_key}"
+        sig_map[state_key] = sig
+        if state.signature(state_key) != sig:
             pending.append(b)
     summary.changed_buckets = len(pending)
     summary.skipped_unchanged = summary.total_buckets - summary.changed_buckets
@@ -124,7 +126,8 @@ def _run_locked(cfg: Config, state: State, *, dry_run: bool = False,
         logger(f"批次 {summary.batches}: 上报 {len(chunk)} 桶, 服务端 accepted={accepted}")
         # 仅在该批成功后写入对应 signature
         for b in chunk:
-            state.mark(b.dedup_key, sig_map[b.dedup_key])
+            state_key = f"{source_prefix}|{b.dedup_key}"
+            state.mark(state_key, sig_map[state_key])
         state.save()
 
     state.last_max_created_at = max_created_at(cfg.db_path)
