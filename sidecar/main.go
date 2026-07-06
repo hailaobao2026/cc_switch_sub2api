@@ -161,6 +161,9 @@ func LoadConfig(path string) (Config, error) {
 	if value := os.Getenv("CC_USAGE_SIDECAR_AUTO_MIGRATE"); value != "" {
 		cfg.AutoMigrate = parseBool(value)
 	}
+	if value := os.Getenv("CC_USAGE_SIDECAR_ALLOWED_SOURCES"); value != "" {
+		cfg.AllowedSources = splitCSV(value)
+	}
 	return cfg, nil
 }
 
@@ -190,6 +193,18 @@ func parseBool(value string) bool {
 	default:
 		return false
 	}
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	items := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			items = append(items, part)
+		}
+	}
+	return items
 }
 
 func RunMigrations(ctx context.Context, db *sql.DB) error {

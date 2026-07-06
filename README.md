@@ -58,6 +58,12 @@ CC Switch 的「当天」聚合桶会随请求持续累加，所以：
 }
 ```
 
+Docker Compose 部署可在 `sub2api/deploy/.env` 中配置：
+
+```env
+CC_USAGE_SIDECAR_ALLOWED_SOURCES=cc-switch,cc-switch-pc-a,cc-switch-laptop
+```
+
 原因是 `source` 是服务端唯一键的一部分。多台电脑如果都使用默认 `source = cc-switch`，同一天同用户同模型的桶会互相覆盖；使用不同 `source` 后，服务端会保留多行，管理端按用户汇总时会自然叠加。
 
 ## 快速上手

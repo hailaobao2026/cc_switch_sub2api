@@ -36,6 +36,7 @@ temp/
 .env
 .env.*
 !.env.example
+!.env.cc-switch-sidecar.example
 config.local.*
 config.sidecar.json
 

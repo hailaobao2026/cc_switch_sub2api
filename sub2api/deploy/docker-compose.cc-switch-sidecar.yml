@@ -26,6 +26,7 @@ services:
       - CC_USAGE_SIDECAR_DATABASE_URL=postgres://${POSTGRES_USER:-sub2api}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-sub2api}?sslmode=disable
       - CC_USAGE_SIDECAR_REPORT_TOKEN=${CC_USAGE_SIDECAR_REPORT_TOKEN:?CC_USAGE_SIDECAR_REPORT_TOKEN is required}
       - CC_USAGE_SIDECAR_AUTO_MIGRATE=${CC_USAGE_SIDECAR_AUTO_MIGRATE:-true}
+      - CC_USAGE_SIDECAR_ALLOWED_SOURCES=${CC_USAGE_SIDECAR_ALLOWED_SOURCES:-cc-switch}
       - TZ=${TZ:-Asia/Shanghai}
     depends_on:
       postgres:

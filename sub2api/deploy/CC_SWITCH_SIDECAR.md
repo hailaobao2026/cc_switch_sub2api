@@ -24,6 +24,7 @@ cat .env.cc-switch-sidecar.example >> .env
 ```env
 POSTGRES_PASSWORD=change_this_secure_password
 CC_USAGE_SIDECAR_REPORT_TOKEN=change-me-to-a-long-random-token
+CC_USAGE_SIDECAR_ALLOWED_SOURCES=cc-switch,cc-switch-pc-a,cc-switch-laptop
 ```
 
 启动：
@@ -90,8 +91,21 @@ docker compose -f docker-compose.yml -f docker-compose.cc-switch-sidecar.yml up 
 {
   "base_url": "http://127.0.0.1:8788",
   "token": "与 CC_USAGE_SIDECAR_REPORT_TOKEN 一致",
-  "username": "alice"
+  "username": "alice",
+  "source": "cc-switch-pc-a"
 }
+```
+
+如果客户端报：
+
+```text
+{"error":"source is not allowed"}
+```
+
+说明客户端配置的 `source` 没有加入 sidecar 白名单。把该值追加到 `.env` 的 `CC_USAGE_SIDECAR_ALLOWED_SOURCES`，然后重建 sidecar：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.cc-switch-sidecar.yml up -d --build --force-recreate cc-switch-usage-sidecar
 ```
 
 ## 数据库

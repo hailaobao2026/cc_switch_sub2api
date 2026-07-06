@@ -42,6 +42,7 @@ Copy-Item config.example.json config.json
 | `CC_USAGE_SIDECAR_DATABASE_URL` | `database_url` |
 | `CC_USAGE_SIDECAR_REPORT_TOKEN` | `report_token` |
 | `CC_USAGE_SIDECAR_AUTO_MIGRATE` | `auto_migrate` |
+| `CC_USAGE_SIDECAR_ALLOWED_SOURCES` | `allowed_sources`，英文逗号分隔 |
 
 ## 运行
 
@@ -88,6 +89,12 @@ docker compose -f docker-compose.yml -f docker-compose.cc-switch-sidecar.yml up 
 {
   "allowed_sources": ["cc-switch", "cc-switch-pc-a", "cc-switch-laptop"]
 }
+```
+
+Docker Compose 部署时可直接在 `.env` 中配置：
+
+```env
+CC_USAGE_SIDECAR_ALLOWED_SOURCES=cc-switch,cc-switch-pc-a,cc-switch-laptop
 ```
 
 否则多台电脑使用默认 `cc-switch` 时，同一天同模型的桶会互相覆盖，表现为最后一次上传的数据生效。
