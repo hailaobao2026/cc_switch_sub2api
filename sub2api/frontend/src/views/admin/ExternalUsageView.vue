@@ -126,7 +126,7 @@
                 v-model.trim="filters.source"
                 type="text"
                 class="input"
-                placeholder="cc-switch"
+                placeholder="全部来源"
                 @keyup.enter="applyFilters"
               />
             </label>
@@ -585,7 +585,7 @@ const filters = reactive({
   start_date: '',
   end_date: '',
   user: '',
-  source: 'cc-switch',
+  source: '',
   app_type: '',
   model: ''
 })
@@ -807,7 +807,7 @@ const handleDateChange = async () => {
 
 const resetFilters = async () => {
   filters.user = ''
-  filters.source = 'cc-switch'
+  filters.source = ''
   filters.app_type = ''
   filters.model = ''
   userSortBy.value = 'total_cost'

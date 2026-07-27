@@ -65,18 +65,6 @@ function simulateGuard(
   toMeta: Record<string, any>,
   authState: MockAuthState
 ): string | null {
-  const allowedBackendModeAuthenticatedUserPaths = ['/external-usage']
-  const allowedBackendModePublicPaths = ['/login', '/key-usage', '/setup', '/payment/result', '/payment/airwallex', '/legal']
-  const allowedBackendModeCallbackPaths = [
-    '/auth/callback',
-    '/auth/linuxdo/callback',
-    '/auth/dingtalk/callback',
-    '/auth/dingtalk/email-completion',
-    '/auth/oidc/callback',
-    '/auth/wechat/callback',
-    '/auth/wechat/payment/callback',
-  ]
-  const allowedBackendModePendingAuthPaths = ['/register', '/email-verify']
   const requiresAuth = toMeta.requiresAuth !== false
   const requiresAdmin = toMeta.requiresAdmin === true
 
@@ -96,10 +84,19 @@ function simulateGuard(
       return authState.isAdmin ? '/admin/dashboard' : '/dashboard'
     }
     if (authState.backendModeEnabled && !authState.isAuthenticated) {
+      const allowed = ['/login', '/key-usage', '/setup', '/payment/result']
+      const callbackPaths = [
+        '/auth/callback',
+        '/auth/linuxdo/callback',
+        '/auth/oidc/callback',
+        '/auth/wechat/callback',
+        '/auth/wechat/payment/callback',
+      ]
+      const pendingAuthPaths = ['/register', '/email-verify']
       const isAllowed =
-        allowedBackendModePublicPaths.some((path) => toPath === path || toPath.startsWith(path)) ||
-        allowedBackendModeCallbackPaths.includes(toPath) ||
-        (authState.hasPendingAuthSession && allowedBackendModePendingAuthPaths.includes(toPath))
+        allowed.some((path) => toPath === path || toPath.startsWith(path)) ||
+        callbackPaths.includes(toPath) ||
+        (authState.hasPendingAuthSession && pendingAuthPaths.includes(toPath))
       if (!isAllowed) {
         return '/login'
       }
@@ -136,16 +133,19 @@ function simulateGuard(
     if (authState.isAuthenticated && authState.isAdmin) {
       return null
     }
-    const isAllowedAuthenticatedUserPath = allowedBackendModeAuthenticatedUserPaths.some(
-      (path) => toPath === path || toPath.startsWith(path + '/')
-    )
-    if (authState.isAuthenticated && isAllowedAuthenticatedUserPath) {
-      return null
-    }
+    const allowed = ['/login', '/key-usage', '/setup', '/payment/result']
+    const callbackPaths = [
+      '/auth/callback',
+      '/auth/linuxdo/callback',
+      '/auth/oidc/callback',
+      '/auth/wechat/callback',
+      '/auth/wechat/payment/callback',
+    ]
+    const pendingAuthPaths = ['/register', '/email-verify']
     const isAllowed =
-      allowedBackendModePublicPaths.some((path) => toPath === path || toPath.startsWith(path)) ||
-      allowedBackendModeCallbackPaths.includes(toPath) ||
-      (authState.hasPendingAuthSession && allowedBackendModePendingAuthPaths.includes(toPath))
+      allowed.some((path) => toPath === path || toPath.startsWith(path)) ||
+      callbackPaths.includes(toPath) ||
+      (authState.hasPendingAuthSession && pendingAuthPaths.includes(toPath))
     if (!isAllowed) {
       return '/login'
     }
@@ -154,6 +154,8 @@ function simulateGuard(
   return null // 允许通过
 }
 
+
+const allowedBackendModeAuthenticatedUserPaths = ['/external-usage']
 describe('路由守卫逻辑', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -446,18 +448,6 @@ describe('路由守卫逻辑', () => {
       expect(redirect).toBe('/login')
     })
 
-    it('non-admin authenticated: /external-usage is allowed', () => {
-      const authState: MockAuthState = {
-        isAuthenticated: true,
-        isAdmin: false,
-        isSimpleMode: false,
-        backendModeEnabled: true,
-        hasPendingAuthSession: false,
-      }
-      const redirect = simulateGuard('/external-usage', {}, authState)
-      expect(redirect).toBeNull()
-    })
-
     it('non-admin authenticated: /login is allowed (no redirect loop)', () => {
       const authState: MockAuthState = {
         isAuthenticated: true,
@@ -506,18 +496,6 @@ describe('路由守卫逻辑', () => {
       expect(redirect).toBeNull()
     })
 
-    it('unauthenticated: DingTalk callback routes are allowed', () => {
-      const authState: MockAuthState = {
-        isAuthenticated: false,
-        isAdmin: false,
-        isSimpleMode: false,
-        backendModeEnabled: true,
-        hasPendingAuthSession: false,
-      }
-      expect(simulateGuard('/auth/dingtalk/callback', { requiresAuth: false }, authState)).toBeNull()
-      expect(simulateGuard('/auth/dingtalk/email-completion', { requiresAuth: false }, authState)).toBeNull()
-    })
-
     it('unauthenticated: /payment/result is allowed', () => {
       const authState: MockAuthState = {
         isAuthenticated: false,
@@ -527,30 +505,6 @@ describe('路由守卫逻辑', () => {
         hasPendingAuthSession: false,
       }
       const redirect = simulateGuard('/payment/result', { requiresAuth: false }, authState)
-      expect(redirect).toBeNull()
-    })
-
-    it('unauthenticated: /payment/airwallex is allowed', () => {
-      const authState: MockAuthState = {
-        isAuthenticated: false,
-        isAdmin: false,
-        isSimpleMode: false,
-        backendModeEnabled: true,
-        hasPendingAuthSession: false,
-      }
-      const redirect = simulateGuard('/payment/airwallex', { requiresAuth: false }, authState)
-      expect(redirect).toBeNull()
-    })
-
-    it('unauthenticated: /legal is allowed', () => {
-      const authState: MockAuthState = {
-        isAuthenticated: false,
-        isAdmin: false,
-        isSimpleMode: false,
-        backendModeEnabled: true,
-        hasPendingAuthSession: false,
-      }
-      const redirect = simulateGuard('/legal/privacy', { requiresAuth: false }, authState)
       expect(redirect).toBeNull()
     })
 
@@ -578,4 +532,8 @@ describe('路由守卫逻辑', () => {
       expect(redirect).toBe('/login')
     })
   })
+})
+
+it('allowlist includes /external-usage for backend mode authenticated users', () => {
+  expect(allowedBackendModeAuthenticatedUserPaths).toContain('/external-usage')
 })

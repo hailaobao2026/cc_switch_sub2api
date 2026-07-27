@@ -77,6 +77,8 @@ func stringPtr(v string) *string {
 }
 
 func TestBackendModeUserGuard(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	tests := []struct {
 		name       string
 		nilService bool
@@ -136,23 +138,19 @@ func TestBackendModeUserGuard(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			gin.SetMode(gin.TestMode)
-
-			r := gin.New()
-			if tc.role != nil {
-				role := *tc.role
-				r.Use(func(c *gin.Context) {
-					c.Set(string(ContextKeyUserRole), role)
-					c.Next()
-				})
-			}
-
 			var svc *service.SettingService
 			if !tc.nilService {
 				svc = newBackendModeSettingService(t, tc.enabled)
 			}
+
+			r := gin.New()
+			r.Use(func(c *gin.Context) {
+				if tc.role != nil {
+					c.Set(string(ContextKeyUserRole), *tc.role)
+				}
+				c.Next()
+			})
 
 			r.Use(BackendModeUserGuard(svc))
 			r.Any("/*path", func(c *gin.Context) {
@@ -167,6 +165,7 @@ func TestBackendModeUserGuard(t *testing.T) {
 		})
 	}
 }
+
 
 func TestBackendModeAuthGuard(t *testing.T) {
 	tests := []struct {

@@ -48,3 +48,11 @@ deploy/redis_data/
 **/.ipynb_checkpoints/
 
 cc_usage_reporter/release/
+
+# Local upgrade/work artifacts
+.upgrade_work/
+sub2api/deploy/cc-switch-offline-images.tar
+**/cc-switch-offline-images.tar
+.playwright-mcp/
+.omc/
+*.png

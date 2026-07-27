@@ -118,6 +118,14 @@ export interface UsageDashboardSnapshotV2Response {
   groups?: GroupStat[]
 }
 
+/**
+ * List usage logs with optional filters
+ * @param page - Page number (default: 1)
+ * @param pageSize - Items per page (default: 20)
+ * @param apiKeyId - Filter by API key ID
+ * @returns Paginated list of usage logs
+ */
+
 export interface ExternalUsageDailyRow {
   user_id: number
   username: string
@@ -187,13 +195,6 @@ export interface ExternalUsageUserSummaryRow {
   last_reported_at: string
 }
 
-/**
- * List usage logs with optional filters
- * @param page - Page number (default: 1)
- * @param pageSize - Items per page (default: 20)
- * @param apiKeyId - Filter by API key ID
- * @returns Paginated list of usage logs
- */
 export async function list(
   page: number = 1,
   pageSize: number = 20,
@@ -320,50 +321,6 @@ export async function getById(id: number): Promise<UsageLog> {
   return data
 }
 
-export async function listExternal(
-  params: ExternalUsageQueryParams,
-  options?: { signal?: AbortSignal }
-): Promise<PaginatedResponse<ExternalUsageDailyRow>> {
-  const { data } = await apiClient.get<PaginatedResponse<ExternalUsageDailyRow>>('/usage/external', {
-    params,
-    signal: options?.signal
-  })
-  return data
-}
-
-export async function getExternalStats(
-  params: ExternalUsageQueryParams,
-  options?: { signal?: AbortSignal }
-): Promise<ExternalUsageStatsResponse> {
-  const { data } = await apiClient.get<ExternalUsageStatsResponse>('/usage/external/stats', {
-    params,
-    signal: options?.signal
-  })
-  return data
-}
-
-export async function getExternalTrend(
-  params: ExternalUsageQueryParams,
-  options?: { signal?: AbortSignal }
-): Promise<TrendDataPoint[]> {
-  const { data } = await apiClient.get<TrendDataPoint[]>('/usage/external/trend', {
-    params,
-    signal: options?.signal
-  })
-  return data
-}
-
-export async function listExternalUsers(
-  params: ExternalUsageQueryParams,
-  options?: { signal?: AbortSignal }
-): Promise<PaginatedResponse<ExternalUsageUserSummaryRow>> {
-  const { data } = await apiClient.get<PaginatedResponse<ExternalUsageUserSummaryRow>>('/usage/external/users', {
-    params,
-    signal: options?.signal
-  })
-  return data
-}
-
 // ==================== Dashboard API ====================
 
 /**
@@ -482,6 +439,51 @@ export async function getMyErrorDetail(id: number): Promise<UserErrorRequestDeta
   return data
 }
 
+
+export async function listExternal(
+  params: ExternalUsageQueryParams,
+  options?: { signal?: AbortSignal }
+): Promise<PaginatedResponse<ExternalUsageDailyRow>> {
+  const { data } = await apiClient.get<PaginatedResponse<ExternalUsageDailyRow>>('/usage/external', {
+    params,
+    signal: options?.signal
+  })
+  return data
+}
+
+export async function getExternalStats(
+  params: ExternalUsageQueryParams,
+  options?: { signal?: AbortSignal }
+): Promise<ExternalUsageStatsResponse> {
+  const { data } = await apiClient.get<ExternalUsageStatsResponse>('/usage/external/stats', {
+    params,
+    signal: options?.signal
+  })
+  return data
+}
+
+export async function getExternalTrend(
+  params: ExternalUsageQueryParams,
+  options?: { signal?: AbortSignal }
+): Promise<TrendDataPoint[]> {
+  const { data } = await apiClient.get<TrendDataPoint[]>('/usage/external/trend', {
+    params,
+    signal: options?.signal
+  })
+  return data
+}
+
+export async function listExternalUsers(
+  params: ExternalUsageQueryParams,
+  options?: { signal?: AbortSignal }
+): Promise<PaginatedResponse<ExternalUsageUserSummaryRow>> {
+  const { data } = await apiClient.get<PaginatedResponse<ExternalUsageUserSummaryRow>>('/usage/external/users', {
+    params,
+    signal: options?.signal
+  })
+  return data
+}
+
 export const usageAPI = {
   list,
   query,
@@ -489,6 +491,7 @@ export const usageAPI = {
   getStatsByDateRange,
   getByDateRange,
   getById,
+  // External CC-Switch usage
   listExternal,
   getExternalStats,
   getExternalTrend,

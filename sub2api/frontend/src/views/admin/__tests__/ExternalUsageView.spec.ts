@@ -179,4 +179,14 @@ describe('ExternalUsageView', () => {
     expect(wrapper.text()).toContain('按用户汇总统计')
     expect(wrapper.text()).toContain('用户')
   })
+
+  it('does not constrain the default source filter', async () => {
+    mountView()
+    await flushPromises()
+
+    expect(userGetExternalStats.mock.calls[0]?.[0]?.source).toBeUndefined()
+    expect(userGetExternalTrend.mock.calls[0]?.[0]?.source).toBeUndefined()
+    expect(userListExternal.mock.calls[0]?.[0]?.source).toBeUndefined()
+    expect(userListExternalUsers.mock.calls[0]?.[0]?.source).toBeUndefined()
+  })
 })

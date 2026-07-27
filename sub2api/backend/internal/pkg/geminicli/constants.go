@@ -38,8 +38,8 @@ const (
 	// GeminiCLIOAuthClientID/Secret are the public OAuth client credentials used by Google Gemini CLI.
 	// They enable the "login without creating your own OAuth client" experience, but Google may
 	// restrict which scopes are allowed for this client.
-	GeminiCLIOAuthClientID     = "YOUR_GEMINI_CLI_GOOGLE_OAUTH_CLIENT_ID"
-	GeminiCLIOAuthClientSecret = "YOUR_GEMINI_CLI_GOOGLE_OAUTH_CLIENT_SECRET"
+	GeminiCLIOAuthClientID     = "REDACTED_GEMINI_CLI_OAUTH_CLIENT_ID.apps.googleusercontent.com"
+	GeminiCLIOAuthClientSecret = "REDACTED_GEMINI_CLI_OAUTH_CLIENT_SECRET"
 
 	// GeminiCLIOAuthClientSecretEnv is the environment variable name for the built-in client secret.
 	GeminiCLIOAuthClientSecretEnv = "GEMINI_CLI_OAUTH_CLIENT_SECRET"

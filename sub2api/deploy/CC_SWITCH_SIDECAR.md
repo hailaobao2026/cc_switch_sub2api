@@ -1,6 +1,11 @@
 # CC Switch Usage Sidecar Docker 部署
 
-这个部署方式使用 compose overlay 把 `cc-switch-usage-sidecar` 加到现有 sub2api Docker 栈里，不直接修改 `docker-compose.yml` 主文件，方便后续同步 sub2api 上游更新。
+这个部署方式使用 compose overlay 把 `cc-switch-usage-sidecar` 加到现有 sub2api Docker 栈里。
+
+说明：
+
+- sidecar 通过 `docker-compose.cc-switch-sidecar.yml` overlay 接入，尽量少侵入。
+- 主程序 `sub2api` 使用本地镜像 `sub2api:cc-switch-local`（含 CC-Switch 用量页面/API 补丁），当前对齐上游 `v0.1.165`。
 
 ## 文件
 
@@ -51,24 +56,34 @@ docker compose -f docker-compose.yml -f docker-compose.cc-switch-sidecar.yml log
 http://127.0.0.1:8080/admin/external-usage
 ```
 
-注意：如果 compose 仍使用 `image: weishaw/sub2api:latest`，页面不会出现，因为官方镜像不包含本地补丁。需要把 sub2api 构建为本地镜像后再启动，例如在 `sub2api` 根目录执行：
+注意：官方镜像 `weishaw/sub2api:latest` 不包含 CC-Switch 统计补丁，页面不会出现。
+
+当前仓库的 `docker-compose.yml` 已把 `sub2api` 配置为本地镜像 `sub2api:cc-switch-local`，并包含 `build` 配置（默认版本参数 `0.1.165`）。首次或升级源码后请显式重建：
 
 ```bash
-docker build -t sub2api:cc-switch-local .
-```
+# 方式 A：compose 负责构建并重建
+cd sub2api/deploy
+docker compose -f docker-compose.yml -f docker-compose.cc-switch-sidecar.yml up -d --build --force-recreate sub2api
 
-然后在 `sub2api/deploy/docker-compose.yml` 中把 sub2api 服务镜像改为：
-
-```yaml
-image: sub2api:cc-switch-local
-```
-
-重启 sub2api：
-
-```bash
-cd /mnt/f/work/code/other/20260626/CC_Switch_plugin/sub2api/deploy
+# 方式 B：先手动构建镜像，再 recreate
+cd sub2api
+docker build -t sub2api:cc-switch-local \
+  --build-arg VERSION=0.1.165 \
+  --build-arg GOPROXY=https://goproxy.cn,direct \
+  --build-arg GOSUMDB=sum.golang.google.cn \
+  -f Dockerfile .
+cd deploy
 docker compose -f docker-compose.yml -f docker-compose.cc-switch-sidecar.yml up -d --force-recreate sub2api
 ```
+
+校验版本：
+
+```bash
+docker logs sub2api 2>&1 | head
+# 期望：Sub2API 0.1.165 ...
+```
+
+说明：若 compose 只有 `image:` 没有 `build:`，`up -d --build` 只会重建 sidecar，主程序仍可能继续使用旧镜像。
 
 默认配置没有把 sidecar 端口暴露到公网，只在 `sub2api-network` 内部监听 `0.0.0.0:8788`。
 

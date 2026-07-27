@@ -62,6 +62,8 @@ type CreateUsageCleanupTaskRequest struct {
 	Timezone    string  `json:"timezone"`
 }
 
+// List handles listing all usage records with filters
+// GET /api/v1/admin/usage
 type ExternalUsageDailyRow struct {
 	UserID              int64   `json:"user_id"`
 	Username            string  `json:"username"`
@@ -170,8 +172,6 @@ func buildExternalUsageWhereClause(c *gin.Context, scopedUserID *int64) (string,
 	return strings.Join(conditions, " AND "), args, nil
 }
 
-// List handles listing all usage records with filters
-// GET /api/v1/admin/usage
 func (h *UsageHandler) List(c *gin.Context) {
 	page, pageSize := response.ParsePagination(c)
 	exactTotal := false
@@ -285,18 +285,19 @@ func (h *UsageHandler) List(c *gin.Context) {
 		SortOrder: c.DefaultQuery("sort_order", "desc"),
 	}
 	filters := usagestats.UsageLogFilters{
-		UserID:      userID,
-		APIKeyID:    apiKeyID,
-		AccountID:   accountID,
-		GroupID:     groupID,
-		Model:       model,
-		RequestType: requestType,
-		Stream:      stream,
-		BillingType: billingType,
-		BillingMode: billingMode,
-		StartTime:   startTime,
-		EndTime:     endTime,
-		ExactTotal:  exactTotal,
+		UserID:            userID,
+		APIKeyID:          apiKeyID,
+		AccountID:         accountID,
+		GroupID:           groupID,
+		Model:             model,
+		ModelFilterSource: usagestats.ModelSourceRequested,
+		RequestType:       requestType,
+		Stream:            stream,
+		BillingType:       billingType,
+		BillingMode:       billingMode,
+		StartTime:         startTime,
+		EndTime:           endTime,
+		ExactTotal:        exactTotal,
 	}
 
 	records, result, err := h.usageService.ListWithFilters(c.Request.Context(), params, filters)
@@ -425,17 +426,18 @@ func (h *UsageHandler) Stats(c *gin.Context) {
 
 	// Build filters and call GetStatsWithFilters
 	filters := usagestats.UsageLogFilters{
-		UserID:      userID,
-		APIKeyID:    apiKeyID,
-		AccountID:   accountID,
-		GroupID:     groupID,
-		Model:       model,
-		RequestType: requestType,
-		Stream:      stream,
-		BillingType: billingType,
-		BillingMode: billingMode,
-		StartTime:   &startTime,
-		EndTime:     &endTime,
+		UserID:            userID,
+		APIKeyID:          apiKeyID,
+		AccountID:         accountID,
+		GroupID:           groupID,
+		Model:             model,
+		ModelFilterSource: usagestats.ModelSourceRequested,
+		RequestType:       requestType,
+		Stream:            stream,
+		BillingType:       billingType,
+		BillingMode:       billingMode,
+		StartTime:         &startTime,
+		EndTime:           &endTime,
 	}
 
 	var stats *usagestats.UsageStats
@@ -722,8 +724,6 @@ func (h *UsageHandler) CancelCleanupTask(c *gin.Context) {
 	response.Success(c, gin.H{"id": taskID, "status": service.UsageCleanupStatusCanceled})
 }
 
-// ExternalDaily handles listing external daily usage reported by sidecars.
-// GET /api/v1/admin/usage/external
 func (h *UsageHandler) ExternalDaily(c *gin.Context) {
 	h.externalDaily(c, nil)
 }

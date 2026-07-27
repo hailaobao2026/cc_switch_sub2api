@@ -1,7 +1,13 @@
 # CC Switch → sub2api 用量上报插件
 
 把本机 **CC Switch** 记录的模型调用用量上报到 **sub2api** 旁路统计表，按用户名/邮箱关联到 sub2api 用户。
-推荐部署方式是独立 **sidecar** 服务：不修改 sub2api 源码，只连接同一个 PostgreSQL，降低后续升级成本。
+
+推荐部署方式：
+
+- **摄取路径**：独立 **sidecar** 服务，只连接同一个 PostgreSQL，不改上游网关写入逻辑。
+- **展示路径**：在本地维护的 `sub2api/` 上叠加 CC-Switch 统计页面与 API 补丁，构建 `sub2api:cc-switch-local` 镜像。
+
+当前对齐上游版本：`sub2api v0.1.165`（镜像构建参数默认 `VERSION=0.1.165`）。
 
 ## 背景
 
@@ -17,6 +23,7 @@
 |---|---|---|
 | [`cc_usage_reporter/`](./cc_usage_reporter/) | 上报客户端：读本地 db → 天×模型聚合 → 去重 → 上报 sidecar | Python 3.10+（纯标准库） |
 | [`sidecar/`](./sidecar/) | 独立摄取服务：token 鉴权 → 解析 sub2api 用户 → upsert `external_usage_daily` | Go + PostgreSQL |
+| [`sub2api/`](./sub2api/) | 基于上游 sub2api 的本地 fork：含 CC-Switch 用量页面 / API / backend mode 放行补丁 | Go + Vue |
 | [`backend_patch/`](./backend_patch/) | 可选嵌入式集成参考；不再是推荐路径 | Go + SQL |
 | [`cc-switch-db-分析.md`](./cc-switch-db-分析.md) | cc-switch.db 结构分析 | — |
 
@@ -90,15 +97,92 @@ python -m cc_usage_reporter run --config config.sidecar.json
 
 ### Docker Compose 运行
 
-如果你使用 `sub2api/deploy/docker-compose.yml` 部署 sub2api，可以叠加 sidecar overlay：
+如果你使用 `sub2api/deploy/docker-compose.yml` 部署 sub2api，可以叠加 sidecar overlay。
+
+`docker-compose.yml` 中的 `sub2api` 服务已配置为本地构建镜像 `sub2api:cc-switch-local`（含 CC-Switch 统计补丁），不要直接使用官方 `weishaw/sub2api:latest`，否则管理端没有 `CC-Switch 用量` 页面。
 
 ```powershell
 cd sub2api\deploy
 Copy-Item .env.example .env
 Get-Content .env.cc-switch-sidecar.example | Add-Content .env
-# 编辑 .env：POSTGRES_PASSWORD / CC_USAGE_SIDECAR_REPORT_TOKEN
-docker compose -f docker-compose.yml -f docker-compose.cc-switch-sidecar.yml up -d --build
+# 编辑 .env：POSTGRES_PASSWORD / CC_USAGE_SIDECAR_REPORT_TOKEN / CC_USAGE_SIDECAR_ALLOWED_SOURCES
+docker compose -f docker-compose.yml -f docker-compose.cc-switch-sidecar.yml up -d --build --force-recreate
 ```
+
+Linux / macOS：
+
+```bash
+cd sub2api/deploy
+cp .env.example .env
+cat .env.cc-switch-sidecar.example >> .env
+# 编辑 .env：POSTGRES_PASSWORD / CC_USAGE_SIDECAR_REPORT_TOKEN / CC_USAGE_SIDECAR_ALLOWED_SOURCES
+docker compose -f docker-compose.yml -f docker-compose.cc-switch-sidecar.yml up -d --build --force-recreate
+```
+
+#### 重要：为什么有时版本还是旧的
+
+如果 compose 里 `sub2api` 只有 `image:`、没有 `build:`，执行：
+
+```bash
+docker compose ... up -d --build
+```
+
+时 **只会重建有 build 配置的 sidecar**，主程序 `sub2api` 只会 `Recreated`，仍复用旧的 `sub2api:cc-switch-local` 镜像，版本会继续显示旧号（例如 `0.1.141`）。
+
+当前仓库已在 `sub2api/deploy/docker-compose.yml` 补上 build 配置，例如：
+
+```yaml
+sub2api:
+  build:
+    context: ..
+    dockerfile: Dockerfile
+    args:
+      VERSION: ${SUB2API_VERSION:-0.1.165}
+      GOPROXY: ${GOPROXY:-https://goproxy.cn,direct}
+      GOSUMDB: ${GOSUMDB:-sum.golang.google.cn}
+  image: sub2api:cc-switch-local
+```
+
+升级源码或补丁后，请强制重建主程序镜像：
+
+```bash
+# 在 sub2api 根目录单独构建
+cd sub2api
+docker build -t sub2api:cc-switch-local \
+  --build-arg VERSION=0.1.165 \
+  --build-arg GOPROXY=https://goproxy.cn,direct \
+  --build-arg GOSUMDB=sum.golang.google.cn \
+  -f Dockerfile .
+
+# 回到 deploy 重建并启动
+cd deploy
+docker compose -f docker-compose.yml -f docker-compose.cc-switch-sidecar.yml up -d --force-recreate sub2api
+```
+
+或一条命令让 compose 负责构建：
+
+```bash
+cd sub2api/deploy
+docker compose -f docker-compose.yml -f docker-compose.cc-switch-sidecar.yml up -d --build --force-recreate sub2api
+```
+
+校验版本：
+
+```bash
+docker logs sub2api 2>&1 | head
+# 期望看到：Sub2API 0.1.165 ...
+docker exec sub2api /app/sub2api -version
+```
+
+可选环境变量：
+
+| 变量 | 说明 | 默认 |
+|---|---|---|
+| `SUB2API_VERSION` | 写入二进制的版本号 | `0.1.165` |
+| `GOPROXY` | Go 模块代理 | `https://goproxy.cn,direct` |
+| `GOSUMDB` | Go checksum DB | `sum.golang.google.cn` |
+| `CC_USAGE_SIDECAR_REPORT_TOKEN` | sidecar 上报鉴权 token | 必填 |
+| `CC_USAGE_SIDECAR_ALLOWED_SOURCES` | 允许的 `source` 白名单（逗号分隔） | `cc-switch` |
 
 详细说明：
 
@@ -210,7 +294,86 @@ GET /api/v1/usage/external/users
 
 ## 升级策略
 
-推荐长期保持 sidecar 独立运行，不改 sub2api 主仓库。sub2api 升级时，只需确认 PostgreSQL 连接和 `users` 表核心字段仍存在：`id`、`email`、`username`、`deleted_at`。
+### 分层原则
+
+1. **sidecar / reporter 尽量独立**：摄取逻辑在 `sidecar/` 与 `cc_usage_reporter/`，不依赖 sub2api 内部 Go 代码。
+2. **展示与查询补丁维护在本地 `sub2api/`**：管理端/用户端 `CC-Switch 用量` 页面、API、backend mode 放行属于本地补丁，升级上游后需要重新合入。
+3. **数据库兼容点**：确认 PostgreSQL 中 `users` 表核心字段仍在：`id`、`email`、`username`、`deleted_at`；外部用量表/视图由 sidecar 迁移维护：
+   - `external_usage_daily`
+   - `admin_external_usage_v`
+
+### 当前基线
+
+- 上游对齐：`Wei-Shaw/sub2api` tag **`v0.1.165`**
+- 本地镜像：`sub2api:cc-switch-local`
+- 本地补丁能力：
+  - 管理端 `/admin/external-usage`
+  - 普通用户 `/external-usage`
+  - API：`/api/v1/admin/usage/external*` 与 `/api/v1/usage/external*`
+  - backend mode 最小放行
+  - compose 本地构建与 sidecar overlay
+
+### 升级 sub2api 上游时建议步骤
+
+```bash
+# 1) 备份本地补丁相关文件（至少）
+# - backend handler/routes/middleware
+# - frontend ExternalUsageView / router / sidebar / i18n / api
+# - deploy/docker-compose.cc-switch-sidecar.yml 与 CC_SWITCH_SIDECAR.md
+
+# 2) 同步上游目标版本源码到 sub2api/
+
+# 3) 重新合入 CC-Switch 补丁后构建
+cd sub2api
+docker build -t sub2api:cc-switch-local --build-arg VERSION=<新版本号> -f Dockerfile .
+
+# 4) 重建容器
+cd deploy
+docker compose -f docker-compose.yml -f docker-compose.cc-switch-sidecar.yml up -d --force-recreate sub2api cc-switch-usage-sidecar
+
+# 5) 验证
+docker logs sub2api 2>&1 | head
+curl -sS http://127.0.0.1:8080/api/v1/health || true
+```
+
+### 本地补丁关键文件（升级后勿丢）
+
+**后端**
+
+- `sub2api/backend/internal/handler/admin/usage_handler.go`（External usage 查询 + `db` 注入）
+- `sub2api/backend/cmd/server/wire_gen.go`（`admin.NewUsageHandler(..., db)`）
+- `sub2api/backend/internal/server/routes/admin.go`
+- `sub2api/backend/internal/server/routes/user.go`
+- `sub2api/backend/internal/server/middleware/backend_mode_guard.go`
+- `sub2api/backend/internal/server/middleware/backend_mode_guard_test.go`
+
+**前端**
+
+- `sub2api/frontend/src/views/admin/ExternalUsageView.vue`
+- `sub2api/frontend/src/api/admin/usage.ts`
+- `sub2api/frontend/src/api/usage.ts`
+- `sub2api/frontend/src/router/index.ts`
+- `sub2api/frontend/src/components/layout/AppSidebar.vue`
+- `sub2api/frontend/src/i18n/locales/zh/common.ts`
+- `sub2api/frontend/src/i18n/locales/en/common.ts`
+
+**部署**
+
+- `sub2api/deploy/docker-compose.yml`（`build` + `image: sub2api:cc-switch-local`）
+- `sub2api/deploy/docker-compose.cc-switch-sidecar.yml`
+- `sub2api/deploy/.env.cc-switch-sidecar.example`
+- `sub2api/deploy/CC_SWITCH_SIDECAR.md`
+
+### 常见问题
+
+**Q: `up -d --build` 后版本还是旧的？**  
+A: 确认 `sub2api` 服务有 `build:`，并使用 `--force-recreate`；必要时先 `docker build -t sub2api:cc-switch-local ...` 再 recreate。
+
+**Q: 官方镜像能不能直接用？**  
+A: 官方 `weishaw/sub2api:latest` **不含** 本项目的 CC-Switch 统计页面与 API，只能完成网关本身；要看 `/admin/external-usage` 必须用本地镜像。
+
+**Q: sidecar 和 sub2api 版本要一起升吗？**  
+A: 不强制。sidecar 只要仍能连同一 PostgreSQL 并解析 `users` 表即可；sub2api 展示补丁随上游升级单独合入。
 
 ## 合规提示
 

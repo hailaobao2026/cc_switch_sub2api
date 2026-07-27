@@ -25,7 +25,7 @@ const (
 	UserInfoURL  = "https://www.googleapis.com/oauth2/v2/userinfo"
 
 	// Antigravity OAuth 客户端凭证
-	ClientID = "YOUR_ANTIGRAVITY_GOOGLE_OAUTH_CLIENT_ID"
+	ClientID = "REDACTED_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com"
 
 	// AntigravityOAuthClientSecretEnv 是 Antigravity OAuth client_secret 的环境变量名。
 	AntigravityOAuthClientSecretEnv = "ANTIGRAVITY_OAUTH_CLIENT_SECRET"
@@ -70,7 +70,7 @@ var (
 )
 
 // defaultClientSecret 可通过环境变量 ANTIGRAVITY_OAUTH_CLIENT_SECRET 配置
-var defaultClientSecret = "YOUR_ANTIGRAVITY_GOOGLE_OAUTH_CLIENT_SECRET"
+var defaultClientSecret = "REDACTED_GOOGLE_OAUTH_CLIENT_SECRET"
 
 func init() {
 	// 从环境变量读取版本号，未设置则使用默认值
