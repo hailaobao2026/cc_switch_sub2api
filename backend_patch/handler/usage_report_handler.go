@@ -45,7 +45,7 @@ func NewUsageReportHandler(repo *repository.ExternalUsageRepo, users UserResolve
 
 type usageReportItem struct {
 	Date                string  `json:"date"`            // YYYY-MM-DD (UTC)
-	AppType             string  `json:"app_type"`        // claude | codex
+	AppType             string  `json:"app_type"`        // claude | codex | magpie
 	Model               string  `json:"model"`           // 计费模型（必填）
 	RequestModel        string  `json:"request_model"`   // 请求时模型
 	RequestCount        int     `json:"request_count"`
@@ -78,6 +78,8 @@ const maxReportItems = 5000
 
 var allowedReportSources = map[string]struct{}{
 	"cc-switch": {},
+	// magpie 网关的用量（magpie 客户端以 --source magpie 单独上报时用）
+	"magpie": {},
 }
 
 // Report 处理 POST /api/v1/usage/report。

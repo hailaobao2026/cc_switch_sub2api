@@ -3,6 +3,6 @@
   "database_url": "postgres://sub2api:sub2api@127.0.0.1:5432/sub2api?sslmode=disable",
   "report_token": "change-me-to-a-long-random-token",
   "auto_migrate": true,
-  "allowed_sources": ["cc-switch"],
+  "allowed_sources": ["cc-switch", "magpie"],
   "max_items": 5000
 }

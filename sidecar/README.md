@@ -31,7 +31,7 @@ Copy-Item config.example.json config.json
 | `database_url` | sub2api PostgreSQL DSN |
 | `report_token` | 客户端上报专用长随机 token |
 | `auto_migrate` | 启动时自动建表/建视图 |
-| `allowed_sources` | 允许写入的来源，默认 `cc-switch`；多电脑同用户上报时需要加入每台电脑的 `source` |
+| `allowed_sources` | 允许写入的来源，默认 `cc-switch`, `magpie`；多电脑同用户上报时需要加入每台电脑的 `source` |
 | `max_items` | 单次上报最大 item 数 |
 
 也支持环境变量覆盖：
@@ -98,6 +98,22 @@ CC_USAGE_SIDECAR_ALLOWED_SOURCES=cc-switch,cc-switch-pc-a,cc-switch-laptop
 ```
 
 否则多台电脑使用默认 `cc-switch` 时，同一天同模型的桶会互相覆盖，表现为最后一次上传的数据生效。
+
+### magpie 用量
+
+客户端支持把 magpie 网关的用量一起上报（`--magpie`）。默认沿用 `source=cc-switch`，
+用 `app_type=magpie` 与服务端已有的 `claude` / `codex` 行区分，**sidecar 无需改动**。
+
+如果希望 magpie 的用量在服务端单独归为一个来源，用不同 `source` 另跑一份客户端，
+并把该来源加入白名单（默认已包含 `magpie`）：
+
+```powershell
+python -m cc_usage_reporter run --config config.sidecar.json --source magpie --magpie --no-cc-switch
+```
+
+```json
+{ "allowed_sources": ["cc-switch", "magpie"] }
+```
 
 然后运行：
 

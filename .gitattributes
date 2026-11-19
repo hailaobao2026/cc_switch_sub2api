@@ -1,0 +1,5 @@
+# 跨平台仓库：shell 脚本一律以 LF 入库，否则 macOS / Linux 上会报
+# "bad interpreter: /usr/bin/env bash^M"。
+# Windows 上 core.autocrlf=true 时工作副本可以转成 CRLF，
+# 但入库以及检出到 POSIX 系统必须是 LF。
+*.sh text eol=lf

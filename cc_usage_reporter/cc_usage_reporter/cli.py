@@ -7,10 +7,9 @@ import sys
 
 from .autostart import get_autostart_status, install_autostart, uninstall_autostart
 from .config import load_config
-from .database import read_daily_model_usage
 from .deps import check_tray_dependencies
 from .release import generate_release_dir
-from .reporter import run
+from .reporter import collect_buckets, run
 from .sub2api_client import Sub2ApiError
 
 
@@ -52,7 +51,21 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-incremental", dest="incremental", action="store_false", help="忽略状态水位线（不影响 signature 去重）")
     p.add_argument("--dry-run", action="store_true", help="演练，不实际上报")
     p.add_argument("--start-hidden", action="store_true", help="GUI 启动时最小化/隐藏窗口")
-    p.set_defaults(only_success=None, verify_tls=None, incremental=True)
+    p.add_argument("--no-cc-switch", dest="cc_switch_enabled", action="store_false",
+                   help="不采集 CC Switch 数据库（配合 --magpie 把 magpie 单独上报到一个来源）")
+
+    # --- magpie 采集 ---
+    p.add_argument("--magpie", dest="magpie_enabled", action="store_true", help="启用 magpie 用量采集")
+    p.add_argument("--no-magpie", dest="magpie_enabled", action="store_false", help="关闭 magpie 用量采集")
+    p.add_argument("--magpie-api-url", dest="magpie_api_url", help="magpie 网关地址，如 http://127.0.0.1:3425（带金额，优先）")
+    p.add_argument("--magpie-path", dest="magpie_path", help="magpie 的 usage.jsonl 路径或所在目录（API 不可用时回退）")
+    p.add_argument("--magpie-app-type", dest="magpie_app_type", help="magpie 桶的 app_type，默认 magpie")
+    p.add_argument("--magpie-agents", dest="magpie_agents", help="逗号分隔的 agent 过滤，如 claude,codex,dsh；空=全部")
+    p.add_argument("--magpie-since-days", dest="magpie_since_days", type=int, help="只采集最近 N 天；0=全部历史")
+    p.add_argument("--magpie-include-logged", dest="magpie_include_logged", action="store_true",
+                   help="包含 magpie 从 agent 会话文件补读的调用（默认排除，避免与其它源重复计数）")
+    p.set_defaults(only_success=None, verify_tls=None, incremental=True,
+                   cc_switch_enabled=None, magpie_enabled=None, magpie_include_logged=None)
     return p
 
 
@@ -112,6 +125,14 @@ def main(argv: list[str] | None = None) -> int:
         "app_types": args.app_types,
         "only_success": args.only_success,
         "verify_tls": args.verify_tls,
+        "cc_switch_enabled": args.cc_switch_enabled,
+        "magpie_enabled": args.magpie_enabled,
+        "magpie_api_url": args.magpie_api_url,
+        "magpie_path": args.magpie_path,
+        "magpie_app_type": args.magpie_app_type,
+        "magpie_agents": args.magpie_agents,
+        "magpie_since_days": args.magpie_since_days,
+        "magpie_include_logged": args.magpie_include_logged,
     }
 
     try:
@@ -122,16 +143,13 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command in {"preview", "show"}:
         try:
-            buckets = read_daily_model_usage(
-                db_path=cfg.db_path,
-                app_types=cfg.app_types,
-                only_success=cfg.only_success,
-                since_epoch=None,
-            )
+            buckets, cc_count, magpie_count = collect_buckets(cfg, logger=print)
         except Exception as exc:
-            print(f"读取数据库失败: {exc}", file=sys.stderr)
+            print(f"读取用量失败: {exc}", file=sys.stderr)
             return 1
-        print(f"聚合桶总数: {len(buckets)}（app_types={cfg.app_types}, only_success={cfg.only_success}）")
+        sources = f"CC Switch={cc_count}" + (f"  magpie={magpie_count}" if cfg.magpie_enabled else "")
+        print(f"聚合桶总数: {len(buckets)}（{sources}, app_types={cfg.app_types}, "
+              f"only_success={cfg.only_success}）")
         total_cost = sum(b.total_cost_usd for b in buckets)
         total_in = sum(b.input_tokens for b in buckets)
         total_out = sum(b.output_tokens for b in buckets)

@@ -135,7 +135,7 @@ func LoadConfig(path string) (Config, error) {
 	cfg := Config{
 		ListenAddr:     "127.0.0.1:8788",
 		AutoMigrate:    true,
-		AllowedSources: []string{"cc-switch"},
+		AllowedSources: []string{"cc-switch", "magpie"},
 		MaxItems:       5000,
 	}
 	if path != "" {

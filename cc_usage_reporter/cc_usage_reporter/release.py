@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import platform
 import shutil
 import tarfile
@@ -10,6 +11,29 @@ from datetime import datetime
 from pathlib import Path
 
 from . import __version__
+
+# 发布目录里的架构名统一写法；同一件事在不同平台叫法不同（amd64/aarch64…）
+_ARCH_ALIASES = {
+    "amd64": "x86_64",
+    "x64": "x86_64",
+    "x86-64": "x86_64",
+    "aarch64": "arm64",
+    "arm64e": "arm64",
+}
+
+
+def machine_arch(explicit: str | None = None) -> str:
+    """发布用的架构名：arm64 / x86_64 / universal2。
+
+    取值优先级：参数 > 环境变量 ``CC_USAGE_RELEASE_ARCH`` > 本机
+    ``platform.machine()``。PyInstaller 打 universal2 时本机仍是单一架构，
+    自动探测看不出来，所以那条路必须显式指定。
+    """
+    value = (explicit or os.environ.get("CC_USAGE_RELEASE_ARCH") or "").strip().lower()
+    if value:
+        return _ARCH_ALIASES.get(value, value)
+    detected = platform.machine().strip().lower()
+    return _ARCH_ALIASES.get(detected, detected or "unknown")
 
 
 RELEASE_LAYOUT_MD = r'''# Release Layout
@@ -196,12 +220,14 @@ def _write_checksums(outdir: Path, artifacts: list[Path]) -> Path:
     return checksum_path
 
 
-def generate_release_dir(*, root: str | None = None, platform_name: str | None = None, pack: bool = False) -> Path:
+def generate_release_dir(*, root: str | None = None, platform_name: str | None = None,
+                         arch: str | None = None, pack: bool = False) -> Path:
     repo = Path(root).resolve() if root else Path(__file__).resolve().parent.parent
     plat = (platform_name or platform.system()).lower()
+    target_arch = machine_arch(arch)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     version = __version__
-    outdir = repo / "release" / f"cc-usage-reporter-v{version}-{plat}-{stamp}"
+    outdir = repo / "release" / f"cc-usage-reporter-v{version}-{plat}-{target_arch}-{stamp}"
 
     docs_dir = outdir / "docs"
     config_dir = outdir / "config"
@@ -224,6 +250,7 @@ def generate_release_dir(*, root: str | None = None, platform_name: str | None =
         "name": "cc-usage-reporter",
         "version": version,
         "platform": plat,
+        "arch": target_arch,
         "generated_at": datetime.now().isoformat(),
         "layout": ["bin", "config", "scripts", "services", "docs", "metadata", "dist"],
         "normalized_bin": ["cc-usage-reporter", "cc-usage-reporter-gui"],

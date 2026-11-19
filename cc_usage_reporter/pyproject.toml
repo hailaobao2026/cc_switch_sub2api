@@ -1,7 +1,7 @@
 [project]
 name = "cc-usage-reporter"
-version = "1.0.0"
-description = "将 CC Switch 本地模型用量上报到 sub2api 平台（按用户名/邮箱关联，每日聚合）"
+version = "1.1.0"
+description = "将 CC Switch 与 magpie 的本地模型用量上报到 sub2api 平台（按用户名/邮箱关联，每日聚合）"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

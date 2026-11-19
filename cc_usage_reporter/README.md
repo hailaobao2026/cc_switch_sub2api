@@ -1,15 +1,20 @@
-# cc_usage_reporter — CC Switch 用量上报客户端
+# cc_usage_reporter — CC Switch / magpie 用量上报客户端
 
-把本机 **CC Switch** 数据库（默认会兼容 Windows / Linux / macOS 常见目录）记录的模型调用用量，按 **天 × 模型** 聚合后上报到本项目的 **sidecar** 服务，再由 sidecar 写入 sub2api 使用的 PostgreSQL 外部用量表。
+把本机 **CC Switch** 数据库与 **magpie** 网关记录的模型调用用量，按 **天 × 模型** 聚合后上报到本项目的 **sidecar** 服务，再由 sidecar 写入 sub2api 使用的 PostgreSQL 外部用量表。
 
 ## 工作原理
 
 ```text
+【数据源 1：CC Switch】
 Windows: %APPDATA%\cc-switch\cc-switch.db
 Linux:   ~/.config/cc-switch/cc-switch.db  或 ~/.cc-switch/cc-switch.db
 macOS:   ~/Library/Application Support/cc-switch/cc-switch.db
     └─ proxy_request_logs (每次请求一行)
-            │  读取(只读) + 按 UTC 天×模型 聚合
+
+【数据源 2：magpie】（--magpie 打开，默认关闭）
+    GET http://127.0.0.1:3425/v1/magpie/usage/requests   ← 首选，行内带 magpie 算好的 cost
+    或 magpie 的 usage.jsonl（便携版在 magpie.exe 同级 data/）← 回退，无金额
+            │  读取 + 按 UTC 天×模型 聚合；magpie 桶的 app_type 固定为 magpie
             ▼
    天×模型 用量桶 (DailyModelUsage)
             │  signature 去重(仅发送新增/变化的桶)
@@ -88,6 +93,45 @@ python -m cc_usage_reporter run --config config.sidecar.json
 | `app_types` | — | 默认 `['claude', 'codex']` |
 | `only_success` | — | 仅上报 2xx 请求（`--all` 可包含失败） |
 | `verify_tls` | `SUB2API_VERIFY_TLS` | HTTPS 自签名证书可设 false / `--no-verify-tls` |
+| `cc_switch_enabled` | `CC_SWITCH_ENABLED` | 是否采集 CC Switch，默认 true（`--no-cc-switch` 关闭） |
+| `magpie_enabled` | `MAGPIE_ENABLED` | 是否采集 magpie，默认 false（`--magpie` 打开） |
+| `magpie_api_url` | `MAGPIE_API_URL` | magpie 网关地址，默认 `http://127.0.0.1:3425` |
+| `magpie_path` | `MAGPIE_USAGE_PATH` | magpie `usage.jsonl` 或其目录；只在 API 不可用时回退使用 |
+| `magpie_app_type` | `MAGPIE_APP_TYPE` | magpie 桶的 `app_type`，默认 `magpie` |
+| `magpie_agents` | `MAGPIE_AGENTS` | 只统计这些 agent（逗号分隔），空=全部 |
+| `magpie_since_days` | `MAGPIE_SINCE_DAYS` | 只拉最近 N 天，默认 30；0=全部历史 |
+| `magpie_include_logged` | `MAGPIE_INCLUDE_LOGGED` | 是否包含 magpie 从 agent 会话文件补读的调用，默认 false |
+| `magpie_prefer_api` | `MAGPIE_PREFER_API` | 是否优先走 HTTP API（有金额），默认 true |
+
+## magpie 用量采集
+
+magpie 不用数据库，网关每服务一次调用就往 `usage.jsonl` 追加一行 JSON。打开 `--magpie` 后，客户端会额外采集它，并和 CC Switch 的桶一起上报：
+
+- **金额口径**：优先走 magpie 的 HTTP API，成立原因是它把每行的 `cost` 用价格表算好并返回；API 不可用时回退解析 `usage.jsonl`，此时记录里没有金额，`total_cost_usd` 记 0，日志会提示。
+- **app_type 隔离**：magpie 桶的 `app_type` 固定为 `magpie`。服务端按 `(user_id, source, usage_date, app_type, model, requested_model)` upsert，所以与既有 `claude` / `codex` 行互不覆盖，**默认 `source=cc-switch` 时 sidecar 无需改配置**。
+- **默认排除 `source=log` 的行**：`/requests` 还会返回 magpie 从 Claude Code / Codex 会话文件里补读的历史调用（本机历史上约 2.6 万行），它们很可能与 CC Switch 上报的桶重复计数，默认跳过；需要时用 `--magpie-include-logged` 打开。`source=search` 的搜索调用不产生模型 token，永远排除。
+- **日期口径**：与 CC Switch 一致，按 **UTC** 取 `YYYY-MM-DD`。
+
+magpie 的 `usage.jsonl` 位置。注意 magpie 的 `internal/appdir.installed()` 在**所有平台（含 macOS）都用 XDG 风格**，macOS 上并不是 `~/Library/Application Support`：
+
+| 场景 | 路径 |
+|---|---|
+| 便携版（Windows） | `<magpie.exe 同级>\data\usage.jsonl`，例如 `D:\apps\magpie\data\usage.jsonl` |
+| 便携版（macOS） | `<Magpie.app 同级>/data/usage.jsonl` |
+| 安装版（Windows / macOS / Linux） | `~/.config/magpie/usage.jsonl`（Windows 为 `%USERPROFILE%\.config\magpie\usage.jsonl`） |
+| 设了 `XDG_CONFIG_HOME` | `$XDG_CONFIG_HOME/magpie/usage.jsonl` |
+
+便携版的 `data` 目录在 **magpie 程序自己旁边**（另一个程序的位置），本程序探测不到，请用界面上的「选择...」手动指定；只有 magpie 与本程序恰好装在同一目录时自动探测才命中。
+
+只想上报 magpie、或者想把 magpie 单独归到一个来源：
+
+```powershell
+# 两个来源一起上报（默认）
+python -m cc_usage_reporter run --config config.sidecar.json --magpie
+
+# 只报 magpie，单独用一个来源（sidecar 的 allowed_sources 需含 magpie）
+python -m cc_usage_reporter run --config config.sidecar.json --source magpie --magpie --no-cc-switch
+```
 
 ## 多电脑同用户上报
 
@@ -158,6 +202,19 @@ python -m cc_usage_reporter run --db-path "/custom/path/cc-switch.db"
 
 常用参数：`--config` `--base-url` `--username` `--email` `--password` `--token` `--source` `--db-path` `--state-path` `--all` `--no-verify-tls` `--no-incremental`。
 
+magpie 相关参数：
+
+| 参数 | 作用 |
+|---|---|
+| `--magpie` / `--no-magpie` | 打开 / 关闭 magpie 采集（默认关闭） |
+| `--magpie-api-url` | magpie 网关地址，默认 `http://127.0.0.1:3425` |
+| `--magpie-path` | `usage.jsonl` 路径或所在目录（API 不可用时回退） |
+| `--magpie-app-type` | magpie 桶的 `app_type`，默认 `magpie` |
+| `--magpie-agents` | 逗号分隔的 agent 过滤，如 `claude,codex,dsh`；空=全部 |
+| `--magpie-since-days` | 只采集最近 N 天；`0`=全部历史 |
+| `--magpie-include-logged` | 包含 magpie 从会话文件补读的调用（默认排除） |
+| `--no-cc-switch` | 不采集 CC Switch，只报 magpie |
+
 ## 打包与分发（Windows / Linux / macOS）
 
 ### Windows
@@ -219,18 +276,41 @@ pyinstaller cc-usage-reporter-gui.spec
 
 ### macOS
 
-可用 PyInstaller 打包：
+macOS 需要区分 **Apple Silicon（arm64）** 与 **Intel（x86_64）**，PyInstaller 不能交叉编译：产物架构由「跑打包的那个 Python」决定。用打包脚本可以显式指定：
 
 ```bash
-python3 -m pip install pyinstaller
-pyinstaller cc-usage-reporter.spec
-pyinstaller cc-usage-reporter-gui.spec
+# 本机架构
+bash packaging/macos/build.sh
+
+# 显式指定（可写 arm64 / x86_64 / universal2）
+bash packaging/macos/build.sh arm64
+bash packaging/macos/build.sh x86_64
+bash packaging/macos/build.sh universal2      # 一个二进制同时含两种架构
+TARGET_ARCH=arm64 bash packaging/macos/build.sh   # CI 里用环境变量
 ```
 
-注意：
+脚本会做三件事：确认当前 Python 能否产出目标架构（不对就直接报错，不给你一份架构错误的包）、跑 PyInstaller、最后用 `lipo -archs` 自检真实架构。
 
-- GUI 版需要系统自带或已安装的 Tk。
-- 首次运行未签名应用时，可能需要在“系统设置 → 隐私与安全性”里允许打开。
+| 目标 | 需要什么 Python | 产物 |
+|---|---|---|
+| `arm64` | arm64 原生 Python（Apple Silicon 上默认） | 仅 Apple Silicon 可运行 |
+| `x86_64` | x86_64 Python（Intel 机器，或 arm64 上用 Rosetta 启动的 x86_64 Python） | Intel + Rosetta 下可运行 |
+| `universal2` | python.org 的 universal2 版 Python | 两种机器都可运行 |
+
+没有 universal2 版 Python 又想要一份包同时覆盖两种机器时，**分别在两台机器上各打一次**即可，发布目录会自动带上架构名：
+
+```
+release/cc-usage-reporter-v1.1.0-darwin-arm64-20261119-XXXXXX/
+release/cc-usage-reporter-v1.1.0-darwin-x86_64-20261119-XXXXXX/
+```
+
+（`CC_USAGE_RELEASE_ARCH` 环境变量可以覆盖架构名，`manifest.json` 里也会记录 `"arch"`。）
+
+其他注意：
+
+- GUI 版需要系统自带或已安装的 Tk；PyInstaller 的 onefile 产物在 macOS 上是普通可执行文件（不带 `.app` 包），首次运行未签名应用时需要在“系统设置 → 隐私与安全性”里允许打开。
+- 系统托盘（pystray）在 macOS 上要求图标运行在主线程，本项目的实现可能无法弹出托盘图标；不影响主窗口和上报功能。
+- 窗口初始尺寸会按屏幕可用区域自动收缩（`gui._fit_to_screen`），1440×900 的 MacBook 不会顶出屏幕。
 
 ### 跨平台运行示例
 
@@ -288,8 +368,10 @@ python -m cc_usage_reporter gui
 GUI 提供：
 
 - 配置 `db_path`、`base_url`、`token`、`email`、`username`
+- **「magpie 数据采集」分组**：勾选启用后，可填网关地址、选 `usage.jsonl`、设 `app_type`、agent 过滤和采集天数
 - 保存配置到系统默认配置目录（Windows / Linux / macOS 自动识别）
-- 点击“立即上传”手动上传
+- 点击“立即上传”手动上传；**上传前会先校验配置，界面上的改动若还没保存会自动保存一次再上传**（上传本身读的是配置文件，避免用旧配置上传失败）
+- 点击“测试读取”会真的读一遍两个数据源并打印桶数与成本（后台线程，不卡界面）
 - 勾选“启动后后台定时上传”后，程序驻留运行并按设定时间自动上传
 - 默认定时：`10:00,18:00`
 
